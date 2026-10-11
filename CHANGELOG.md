@@ -5,6 +5,7 @@ All notable changes to this project are documented here. The format follows [Kee
 ## [Unreleased]
 
 ### Added
+- `lab` command-line entry point: `list`, `scan` (local or remote repos, aggregated summary and exit code), `verify`, and `doctor`. Scenarios are auto-discovered.
 - **Scenario 04 — mutable action tag hijack:** vulnerable workflow, five-vector scanner (`--skip-official` support), Sigma rule, SHA-pinned hardened workflow, 12 verification checks.
 - Community health files: `LICENSE` (MIT), `SECURITY.md`, `CODE_OF_CONDUCT.md`, `CONTRIBUTING.md`, `CITATION.cff`.
 - GitHub issue forms, pull request template, `CODEOWNERS`, and Dependabot configuration for GitHub Actions.

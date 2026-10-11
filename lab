@@ -1,0 +1,175 @@
+#!/usr/bin/env bash
+# lab — single entry point for the CI/CD Pipeline Compromise Lab.
+#
+# Usage:
+#   ./lab list                              list scenarios and their status
+#   ./lab scan <path> [--skip-official]     run every scenario scanner against a local repo
+#   ./lab scan --repo <owner/repo>          run every scanner against a remote repo (needs gh)
+#   ./lab verify [scenario-id|all]          prove the hardened workflows resist the attacks
+#   ./lab doctor                            check that required tools are installed
+#   ./lab help                              show this help
+#
+# Scenario ids are the directory suffixes, e.g. "01-pwn-request" or just "01".
+#
+# Exit codes:
+#   0 — clean (scan: no findings; verify: all passed)
+#   1 — findings detected (scan) or verification failed (verify)
+#   2 — usage error or missing dependency
+
+set -euo pipefail
+
+LAB_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[0;33m'
+BOLD='\033[1m'
+NC='\033[0m'
+
+die() { echo -e "${RED}ERROR:${NC} $*" >&2; exit 2; }
+
+usage() {
+  sed -n '2,15p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'
+}
+
+# Print scenario directory names (e.g. 01-pwn-request), sorted.
+scenario_ids() {
+  local d
+  for d in "$LAB_ROOT"/detections/*/; do
+    [ -f "${d}detect.sh" ] && basename "$d"
+  done | sort
+}
+
+# Resolve "01" or "01-pwn-request" to the full id; empty output if unknown.
+resolve_id() {
+  local want="$1" id
+  while IFS= read -r id; do
+    if [ "$id" = "$want" ] || [ "${id%%-*}" = "$want" ]; then
+      echo "$id"
+      return
+    fi
+  done < <(scenario_ids)
+}
+
+cmd_list() {
+  printf '%b%-4s %-22s %-9s %-9s %-9s %s%b\n' "$BOLD" "ID" "SCENARIO" "ATTACK" "DETECT" "VERIFY" "HARDENED" "$NC"
+  local id n name a d v h
+  while IFS= read -r id; do
+    n="${id%%-*}"
+    name="${id#*-}"
+    [ -d "$LAB_ROOT/attacks/$id" ]            && a="yes" || a="-"
+    [ -x "$LAB_ROOT/detections/$id/detect.sh" ] && d="yes" || d="-"
+    [ -x "$LAB_ROOT/verify/$id/verify.sh" ]     && v="yes" || v="-"
+    [ -d "$LAB_ROOT/hardened/$id" ]           && h="yes" || h="-"
+    printf '%-4s %-22s %-9s %-9s %-9s %s\n' "$n" "$name" "$a" "$d" "$v" "$h"
+  done < <(scenario_ids)
+}
+
+cmd_doctor() {
+  local missing=0 tool
+  for tool in bash awk grep sed git; do
+    if command -v "$tool" >/dev/null 2>&1; then
+      echo -e "${GREEN}ok${NC}       $tool"
+    else
+      echo -e "${RED}missing${NC}  $tool (required)"; missing=1
+    fi
+  done
+  for tool in gh shellcheck; do
+    if command -v "$tool" >/dev/null 2>&1; then
+      echo -e "${GREEN}ok${NC}       $tool"
+    else
+      echo -e "${YELLOW}absent${NC}   $tool (optional: gh = remote scans, shellcheck = contributor lint)"
+    fi
+  done
+  [ "$missing" -eq 0 ] || exit 2
+}
+
+cmd_scan() {
+  local target="" remote="" extra=()
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      --repo) remote="${2:-}"; [ -n "$remote" ] || die "--repo needs owner/repo"; shift 2 ;;
+      --skip-official) extra+=("$1"); shift ;;
+      -*) die "unknown option: $1" ;;
+      *) target="$1"; shift ;;
+    esac
+  done
+  [ -n "$target" ] || [ -n "$remote" ] || die "usage: ./lab scan <path> | --repo <owner/repo>"
+
+  local mode="static" subject="$target"
+  if [ -n "$remote" ]; then
+    command -v gh >/dev/null 2>&1 || die "remote scans need the gh CLI"
+    mode="runtime"; subject="$remote"
+  else
+    [ -d "$target" ] || die "not a directory: $target"
+  fi
+
+  local id out rc flagged=0 total=0 failed=0
+  local -a summary=()
+  while IFS= read -r id; do
+    total=$((total + 1))
+    rc=0
+    # --skip-official is only understood by the scenario 04 scanner.
+    local -a flags=()
+    if [ "$id" = "04-tag-hijack" ] && [ "${#extra[@]}" -gt 0 ]; then flags=("${extra[@]}"); fi
+    out=$("$LAB_ROOT/detections/$id/detect.sh" "$mode" "$subject" ${flags[@]+"${flags[@]}"} 2>&1) || rc=$?
+    case "$rc" in
+      0) summary+=("$(printf '%-22s %bclean%b' "$id" "$GREEN" "$NC")") ;;
+      1) flagged=$((flagged + 1))
+         summary+=("$(printf '%-22s %b%s finding(s)%b' "$id" "$RED" "$(grep -c 'FINDING' <<<"$out" || true)" "$NC")")
+         echo -e "${BOLD}── $id ──${NC}"; echo "$out"; echo ;;
+      *) failed=$((failed + 1))
+         summary+=("$(printf '%-22s %berror (exit %s)%b' "$id" "$YELLOW" "$rc" "$NC")")
+         echo -e "${BOLD}── $id ──${NC}"; echo "$out"; echo ;;
+    esac
+  done < <(scenario_ids)
+
+  echo -e "${BOLD}=== Scan summary: $subject ===${NC}"
+  printf '%s\n' "${summary[@]}"
+  echo
+  echo "$total scanner(s) run, $flagged flagged, $failed errored."
+
+  if [ "$failed" -gt 0 ]; then exit 2; fi
+  if [ "$flagged" -gt 0 ]; then exit 1; fi
+}
+
+cmd_verify() {
+  local which="${1:-all}" id status=0 ids=()
+  if [ "$which" = "all" ]; then
+    while IFS= read -r id; do ids+=("$id"); done < <(scenario_ids)
+  else
+    id=$(resolve_id "$which")
+    [ -n "$id" ] || die "unknown scenario: $which (try ./lab list)"
+    ids=("$id")
+  fi
+
+  local -a summary=()
+  for id in "${ids[@]}"; do
+    local script="$LAB_ROOT/verify/$id/verify.sh" out rc=0
+    if [ ! -x "$script" ]; then
+      summary+=("$(printf '%-22s %bno verify script%b' "$id" "$YELLOW" "$NC")")
+      continue
+    fi
+    out=$("$script" static 2>&1) || rc=$?
+    if [ "$rc" -eq 0 ]; then
+      summary+=("$(printf '%-22s %bPASS%b  %s' "$id" "$GREEN" "$NC" "$(grep -o '[0-9]* passed, [0-9]* failed' <<<"$out" | tail -1)")")
+    else
+      status=1
+      summary+=("$(printf '%-22s %bFAIL%b' "$id" "$RED" "$NC")")
+      echo -e "${BOLD}── $id ──${NC}"; echo "$out"; echo
+    fi
+  done
+
+  echo -e "${BOLD}=== Verification summary ===${NC}"
+  printf '%s\n' "${summary[@]}"
+  exit "$status"
+}
+
+case "${1:-help}" in
+  list)    cmd_list ;;
+  scan)    shift; cmd_scan "$@" ;;
+  verify)  shift; cmd_verify "$@" ;;
+  doctor)  cmd_doctor ;;
+  help|-h|--help) usage ;;
+  *) usage >&2; exit 2 ;;
+esac

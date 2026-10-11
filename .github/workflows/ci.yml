@@ -30,7 +30,7 @@ jobs:
       - name: Lint shell scripts
         run: |
           shopt -s nullglob
-          shellcheck detections/*/detect.sh verify/*/verify.sh
+          shellcheck lab detections/*/detect.sh verify/*/verify.sh
 
   verify:
     name: Verify scenarios
@@ -42,17 +42,7 @@ jobs:
           persist-credentials: false
 
       - name: Run all verification suites
-        run: |
-          status=0
-          for script in verify/*/verify.sh; do
-            echo "::group::$script"
-            if ! bash "$script" static; then
-              echo "::error file=$script::verification failed"
-              status=1
-            fi
-            echo "::endgroup::"
-          done
-          exit "$status"
+        run: ./lab verify
 
   scan-self:
     name: Scan own workflows
@@ -64,14 +54,4 @@ jobs:
           persist-credentials: false
 
       - name: Run lab scanners against this repository's own workflows
-        run: |
-          status=0
-          for detector in detections/*/detect.sh; do
-            echo "::group::$detector"
-            if ! bash "$detector" static .; then
-              echo "::error file=$detector::this repository's own workflows trip its own detector"
-              status=1
-            fi
-            echo "::endgroup::"
-          done
-          exit "$status"
+        run: ./lab scan .

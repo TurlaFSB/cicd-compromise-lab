@@ -140,6 +140,19 @@ cicd-compromise-lab/                    turla-lab-targets/ (separate org)
 
 ## Quick start
 
+The `lab` script is the single entry point for everything below:
+
+```bash
+./lab doctor                    # check required tools
+./lab list                      # scenarios and what each one ships
+./lab scan /path/to/your/repo   # run every scenario scanner against a local repo
+./lab scan --repo owner/repo    # same, against a remote repo (needs gh)
+./lab verify                    # prove every hardened workflow resists its attack
+./lab verify 04                 # ...or just one scenario
+```
+
+`./lab scan` exits `1` when any scanner reports a finding, so it drops straight into CI as a gate. Scenario scanners are discovered automatically, so new scenarios appear in `list`, `scan` and `verify` with no extra wiring.
+
 ### Prerequisites
 
 - `bash` 4+, `awk`, `grep` (standard on any Unix system)
