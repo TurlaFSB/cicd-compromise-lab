@@ -1,5 +1,12 @@
 # CI/CD Pipeline Compromise Lab
 
+[![CI](https://github.com/TurlaFSB/cicd-compromise-lab/actions/workflows/ci.yml/badge.svg)](https://github.com/TurlaFSB/cicd-compromise-lab/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![OWASP CI/CD Top 10](https://img.shields.io/badge/OWASP-CI%2FCD%20Top%2010-orange.svg)](https://owasp.org/www-project-top-10-ci-cd-security-risks/)
+[![MITRE ATT&CK](https://img.shields.io/badge/MITRE-ATT%26CK-red.svg)](https://attack.mitre.org/)
+[![Sigma](https://img.shields.io/badge/detections-Sigma-informational.svg)](https://sigmahq.io/)
+[![PRs welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](CONTRIBUTING.md)
+
 A reproducible security lab that demonstrates real-world attacks against GitHub Actions CI/CD pipelines, detects them with Sigma rules and automated scanners, hardens the pipelines with structural fixes, and proves the hardening works through automated verification.
 
 Every scenario follows the same closed loop:
@@ -22,6 +29,14 @@ CI/CD pipelines hold secrets, publish artifacts, and deploy to production — ma
 | 04 | [Mutable action tag hijack](#scenario-04--mutable-action-tag-hijack) | CICD-SEC-3 | T1195.001 | Planned |
 | 05 | [Cache poisoning](#scenario-05--cache-poisoning) | CICD-SEC-9 | T1195.002 | Planned |
 | 06 | [Artifact tampering](#scenario-06--artifact-tampering) | CICD-SEC-9 | T1195 | Planned |
+| 07 | Self-hosted runner persistence | CICD-SEC-7 | T1053, T1547 | Planned |
+| 08 | `GITHUB_ENV` / `GITHUB_PATH` injection | CICD-SEC-4 | T1574 | Planned |
+| 09 | Reusable workflow trust boundary | CICD-SEC-3, CICD-SEC-4 | T1195.001 | Planned |
+| 10 | `GITHUB_TOKEN` over-privilege | CICD-SEC-5, CICD-SEC-2 | T1078.004 | Planned |
+| 11 | `workflow_run` artifact poisoning | CICD-SEC-4 | T1195 | Planned |
+| 12 | OIDC trust policy misconfiguration | CICD-SEC-2, CICD-SEC-5 | T1078.004 | Planned |
+| 13 | Credential leakage via artifacts | CICD-SEC-6 | T1552.001 | Planned |
+| 14 | Dependency confusion and install-script abuse | CICD-SEC-3 | T1195.001 | Planned |
 
 ### Scenario 01 — Pwn request
 
@@ -102,6 +117,8 @@ cicd-compromise-lab/                    turla-lab-targets/ (separate org)
 │       └── README.md
 ├── docs/
 │   └── threat-model.md
+├── .github/                     ← CI, issue forms, PR template, CODEOWNERS, Dependabot
+├── CONTRIBUTING.md  SECURITY.md  CODE_OF_CONDUCT.md  CHANGELOG.md  CITATION.cff  LICENSE
 └── vulnerable/
     └── README.md                ← target repo index
 ```
@@ -182,13 +199,23 @@ Each scenario has its own documentation at four levels of detail:
 
 ## Roadmap
 
-- [x] Scenario 03 — Secret exfiltration
-- [ ] Scenario 04 — Mutable action tag hijack
-- [ ] Scenario 05 — Cache poisoning
-- [ ] Scenario 06 — Artifact tampering
-- [ ] Unified CI workflow that runs all verification suites on every push
+- [x] Scenarios 01–03 with the full attack → detect → harden → verify loop
+- [x] CI that runs every verification suite, `shellcheck`, and a self-scan on each push
+- [ ] Scenarios 04–07 — action tag hijack, cache poisoning, artifact tampering, self-hosted runner persistence
+- [ ] Scenarios 08–10 — `GITHUB_ENV` injection, reusable workflow trust, `GITHUB_TOKEN` over-privilege
+- [ ] Unified scanner covering all scenarios with SARIF output
+- [ ] Scenarios 11–14 — `workflow_run` poisoning, OIDC misconfiguration, artifact credential leakage, dependency confusion
+- [ ] Empirical scan of public repositories and comparison against `zizmor` and `actionlint`
 - [ ] Jenkins phase 2 (separate top-level folder or repo)
+
+## Contributing
+
+Contributions are welcome, from scanner false-positive reports to whole new scenarios. Read [CONTRIBUTING.md](CONTRIBUTING.md) for the scenario contract and coding standards. Report security issues in the project itself privately, as described in [SECURITY.md](SECURITY.md). All participation is covered by the [Code of Conduct](CODE_OF_CONDUCT.md).
+
+## Citation
+
+If you use this lab in research, teaching, or tooling, please cite it using [CITATION.cff](CITATION.cff) (GitHub's **Cite this repository** button).
 
 ## License
 
-This project is intended for educational and defensive security research purposes only.
+Released under the [MIT License](LICENSE). The attack material is provided for education and defensive research. Use it only against the lab's own repositories or systems you own and are explicitly authorized to test.

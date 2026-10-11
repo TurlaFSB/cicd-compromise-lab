@@ -1,0 +1,11 @@
+# Evidence captured from live runs may embed run metadata; keep curated
+# evidence under attacks/*/evidence/ and ignore raw dumps.
+*.log
+*.tmp
+*.swp
+.DS_Store
+.env
+.env.*
+*.pem
+*.key
+tmp/

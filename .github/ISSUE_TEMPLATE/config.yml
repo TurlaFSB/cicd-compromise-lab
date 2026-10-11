@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Report a security vulnerability in this project
+    url: https://github.com/TurlaFSB/cicd-compromise-lab/security/advisories/new
+    about: Private reporting for flaws in hardened workflows, scanners, or verification. See SECURITY.md for scope.
+  - name: Ask a question or share an idea
+    url: https://github.com/TurlaFSB/cicd-compromise-lab/discussions
+    about: Questions, usage help, and open-ended ideas belong in Discussions.

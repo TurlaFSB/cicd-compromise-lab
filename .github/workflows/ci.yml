@@ -1,0 +1,77 @@
+name: CI
+
+# Runs every scenario's verification suite and lints all shell scripts.
+# This workflow follows the same rules the lab teaches: least-privilege
+# permissions, SHA-pinned actions, no secrets, and no pull_request_target.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  shellcheck:
+    name: ShellCheck
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+
+      - name: Lint shell scripts
+        run: |
+          shopt -s nullglob
+          shellcheck detections/*/detect.sh verify/*/verify.sh
+
+  verify:
+    name: Verify scenarios
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+
+      - name: Run all verification suites
+        run: |
+          status=0
+          for script in verify/*/verify.sh; do
+            echo "::group::$script"
+            if ! bash "$script" static; then
+              echo "::error file=$script::verification failed"
+              status=1
+            fi
+            echo "::endgroup::"
+          done
+          exit "$status"
+
+  scan-self:
+    name: Scan own workflows
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+
+      - name: Run lab scanners against this repository's own workflows
+        run: |
+          status=0
+          for detector in detections/*/detect.sh; do
+            echo "::group::$detector"
+            if ! bash "$detector" static .; then
+              echo "::error file=$detector::this repository's own workflows trip its own detector"
+              status=1
+            fi
+            echo "::endgroup::"
+          done
+          exit "$status"

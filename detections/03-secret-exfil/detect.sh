@@ -24,6 +24,7 @@
 #   1 — secret exfiltration pattern DETECTED (findings printed to stdout)
 #   2 — usage error or missing dependency
 
+# shellcheck disable=SC2016  # regexes intentionally contain literal '$' (shell variable names in scanned YAML)
 set -euo pipefail
 
 # ──────────────────────────────────────────────────────────────
@@ -64,10 +65,6 @@ detect_static() {
     [ -f "$wf" ] || continue
     local base
     base=$(basename "$wf")
-
-    # Strip comments for analysis (but keep them for line-number reporting)
-    local content
-    content=$(grep -v '^[[:space:]]*#' "$wf")
 
     local file_findings=0
 
@@ -112,17 +109,9 @@ detect_static() {
       file_findings=1
     fi
 
-    # Also check for the reverse pattern: command | piped from secret
-    if echo "$run_blocks" | grep -v '^[[:space:]]*#' | grep -qE 'echo[[:space:]].*(\$DEPLOY_KEY|\$\{DEPLOY_KEY).*\|[[:space:]]*(base64|xxd|od)'; then
-      # Already caught above — avoid double-reporting
-      :
-    fi
-
     # ── Vector 3: secrets scoped to jobs that don't need them ───
     # Check for secrets in workflow-level or build-job-level env:
     # A secret should only be in the deploy job, not in build
-    local wf_level_secrets=0
-    local build_job_secrets=0
 
     # Check workflow-level env: for secrets
     local wf_env
@@ -137,7 +126,6 @@ detect_static() {
       echo "  Secrets should be scoped to the specific job and step that needs them."
       echo ""
       file_findings=1
-      wf_level_secrets=1
     fi
 
     # Check for secrets in the build job's env: block
@@ -156,7 +144,6 @@ detect_static() {
       echo "$build_env" | grep -E 'secrets\.' | sed 's/^/    /'
       echo ""
       file_findings=1
-      build_job_secrets=1
     fi
 
     # ── Vector 4: overly broad workflow-level permissions ────────
@@ -219,6 +206,7 @@ detect_static() {
       unpinned=$(grep -v '^[[:space:]]*#' "$wf" | grep -E 'uses:[[:space:]]+[^@]+@v[0-9]' | head -5)
       finding "$base: MUTABLE ACTION TAGS — actions referenced by tag instead of commit SHA."
       echo "  Unpinned action(s):"
+      # shellcheck disable=SC2001  # multi-line indent; ${//} would only touch line 1
       echo "$unpinned" | sed 's/^/    /'
       echo ""
       file_findings=1
@@ -264,7 +252,7 @@ detect_runtime() {
   # Track which workflows we've already analyzed
   local checked_workflows=""
 
-  while IFS=' ' read -r run_id event conclusion workflow_id; do
+  while IFS=' ' read -r run_id _event _conclusion workflow_id; do
     # Skip workflows we've already checked
     if echo "$checked_workflows" | grep -q "^${workflow_id}$"; then
       continue

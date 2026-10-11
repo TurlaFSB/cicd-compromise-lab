@@ -1,0 +1,24 @@
+cff-version: 1.2.0
+message: "If you use this lab in research, teaching, or tooling, please cite it as below."
+type: software
+title: "CI/CD Pipeline Compromise Lab"
+abstract: >-
+  A reproducible lab that demonstrates real-world attacks against GitHub
+  Actions pipelines, detects them with Sigma rules and automated scanners,
+  hardens the pipelines, and proves the hardening works through automated
+  verification.
+authors:
+  - family-names: Verma
+    given-names: Pranav
+    alias: TurlaFSB
+repository-code: "https://github.com/TurlaFSB/cicd-compromise-lab"
+license: MIT
+date-released: "2026-10-11"
+keywords:
+  - cicd
+  - github-actions
+  - supply-chain-security
+  - detection-engineering
+  - sigma
+  - owasp-cicd-top-10
+  - devsecops

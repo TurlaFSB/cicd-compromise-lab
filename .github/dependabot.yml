@@ -1,0 +1,12 @@
+version: 2
+updates:
+  # Keeps SHA-pinned actions current. Dependabot updates both the commit SHA
+  # and the trailing version comment.
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    commit-message:
+      prefix: "ci"
+    labels:
+      - "dependencies"

@@ -1,0 +1,9 @@
+# Default owner for everything
+*                         @TurlaFSB
+
+# Security-sensitive: scanners, verification, hardened references, and CI
+/detections/              @TurlaFSB
+/verify/                  @TurlaFSB
+/hardened/                @TurlaFSB
+/.github/                 @TurlaFSB
+/SECURITY.md              @TurlaFSB

@@ -1,0 +1,61 @@
+name: Bug report
+description: A scanner false positive or false negative, a failing verification check, or broken documentation.
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for helping improve the lab. **Do not use this form to report a security flaw** in a hardened workflow or scanner; use private reporting (see SECURITY.md).
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - Detection script (detect.sh)
+        - Sigma rule
+        - Verification script (verify.sh)
+        - Hardened workflow
+        - Attack write-up / documentation
+        - CI
+    validations:
+      required: true
+  - type: input
+    id: scenario
+    attributes:
+      label: Scenario
+      description: For example, 02-script-injection
+    validations:
+      required: true
+  - type: dropdown
+    id: kind
+    attributes:
+      label: What kind of problem?
+      options:
+        - False positive (flags a safe workflow)
+        - False negative (misses a vulnerable workflow)
+        - Script error or crash
+        - Verification passes/fails incorrectly
+        - Documentation error
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Steps to reproduce
+      description: Include the exact command and, ideally, a minimal workflow file that triggers the problem.
+      render: shell
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected vs. actual behavior
+    validations:
+      required: true
+  - type: input
+    id: env
+    attributes:
+      label: Environment
+      description: OS, bash version (`bash --version`), awk implementation (gawk, mawk, BSD awk).
+    validations:
+      required: true

@@ -36,7 +36,7 @@ echo "==> Staging malicious payload as tests/evil.test.js"
 cp "$SCRIPT_DIR/payload/evil.test.js" tests/evil.test.js
 
 git add tests/evil.test.js
-git -c user.name="TurlaFSB" -c user.email="cdsprince0112@gmail.com" \
+git -c user.name="TurlaFSB" -c user.email="ltprince0112@gmail.com" \
   commit -m "Add a new test case for edge values
 
 (This commit message is deliberately mundane — in a real attack, a

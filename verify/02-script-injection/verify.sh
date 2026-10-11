@@ -22,6 +22,7 @@
 #   1 — verification FAILED (hardened workflow still vulnerable)
 #   2 — usage error or missing dependency
 
+# shellcheck disable=SC2016  # patterns intentionally contain literal '$' (variable names in scanned YAML)
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

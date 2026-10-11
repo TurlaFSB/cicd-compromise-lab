@@ -1,0 +1,70 @@
+name: New scenario proposal
+description: Propose a new GitHub Actions attack scenario for the lab.
+labels: ["scenario-proposal"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Every scenario ships as a closed loop: vulnerable workflow, attack, detection, hardened fix, and verification. Please read CONTRIBUTING.md first.
+  - type: input
+    id: title
+    attributes:
+      label: Scenario title
+    validations:
+      required: true
+  - type: textarea
+    id: mechanism
+    attributes:
+      label: Attack mechanism
+      description: How does the attack work? What does the attacker control, and what do they gain?
+    validations:
+      required: true
+  - type: textarea
+    id: references
+    attributes:
+      label: Real-world basis
+      description: Incidents, CVEs, advisories, or research this is based on (links).
+    validations:
+      required: true
+  - type: dropdown
+    id: owasp
+    attributes:
+      label: OWASP CI/CD risk
+      multiple: true
+      options:
+        - CICD-SEC-1 Insufficient Flow Control Mechanisms
+        - CICD-SEC-2 Inadequate Identity and Access Management
+        - CICD-SEC-3 Dependency Chain Abuse
+        - CICD-SEC-4 Poisoned Pipeline Execution
+        - CICD-SEC-5 Insufficient PBAC
+        - CICD-SEC-6 Insufficient Credential Hygiene
+        - CICD-SEC-7 Insecure System Configuration
+        - CICD-SEC-8 Ungoverned Usage of 3rd Party Services
+        - CICD-SEC-9 Improper Artifact Integrity Validation
+        - CICD-SEC-10 Insufficient Logging and Visibility
+    validations:
+      required: true
+  - type: input
+    id: mitre
+    attributes:
+      label: MITRE ATT&CK technique(s)
+      description: For example, T1195.001
+  - type: textarea
+    id: distinct
+    attributes:
+      label: How is this distinct from existing scenarios?
+    validations:
+      required: true
+  - type: textarea
+    id: fix
+    attributes:
+      label: Proposed fix and how it can be verified offline
+    validations:
+      required: true
+  - type: checkboxes
+    id: safety
+    attributes:
+      label: Safety
+      options:
+        - label: This can be demonstrated using only dummy secrets and the `turla-lab-targets` organization.
+          required: true
