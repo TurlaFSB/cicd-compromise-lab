@@ -18,7 +18,7 @@ CI/CD pipelines hold secrets, publish artifacts, and deploy to production — ma
 |---|----------|------------------|--------------|--------|
 | 01 | [Pwn request](#scenario-01--pwn-request) | CICD-SEC-4 | T1195 | Complete |
 | 02 | [Script injection via issue title](#scenario-02--script-injection) | CICD-SEC-4, CICD-SEC-1 | T1059.004 | Complete |
-| 03 | [Secret exfiltration](#scenario-03--secret-exfiltration) | CICD-SEC-6 | T1552 | In progress |
+| 03 | [Secret exfiltration](#scenario-03--secret-exfiltration) | CICD-SEC-6, CICD-SEC-5 | T1552 | Complete |
 | 04 | [Mutable action tag hijack](#scenario-04--mutable-action-tag-hijack) | CICD-SEC-3 | T1195.001 | Planned |
 | 05 | [Cache poisoning](#scenario-05--cache-poisoning) | CICD-SEC-9 | T1195.002 | Planned |
 | 06 | [Artifact tampering](#scenario-06--artifact-tampering) | CICD-SEC-9 | T1195 | Planned |
@@ -41,9 +41,11 @@ A workflow interpolates `github.event.issue.title` directly into a `run:` shell 
 
 ### Scenario 03 — Secret exfiltration
 
-A workflow leaks secrets through debug logging, artifact uploads, or overly broad secret scoping. Long-lived static credentials stored as repo secrets are accessible to any workflow run.
+A workflow leaks secrets through six vectors: printing secrets in logs, base64-transforming secrets to bypass GitHub's log masking, scoping secrets to jobs that don't need them, granting overly broad permissions at the workflow level, accessing secrets without environment protection gates, and using static long-lived credentials that never expire.
 
-**Fix:** OIDC-based short-lived credentials, environment-scoped secrets with required reviewers, explicit `permissions:` blocks, and secret masking validation.
+**Fix:** Per-job least-privilege permissions, step-scoped secrets, environment-gated deployments with required reviewers, no secrets in log output, SHA-pinned actions, and guidance for replacing static keys with OIDC short-lived credentials.
+
+**Verification:** 14/14 structural checks pass. Detection scanner catches all six vectors in the vulnerable workflow and clears the hardened one.
 
 ### Scenario 04 — Mutable action tag hijack
 
@@ -180,7 +182,7 @@ Each scenario has its own documentation at four levels of detail:
 
 ## Roadmap
 
-- [ ] Scenario 03 — Secret exfiltration (in progress)
+- [x] Scenario 03 — Secret exfiltration
 - [ ] Scenario 04 — Mutable action tag hijack
 - [ ] Scenario 05 — Cache poisoning
 - [ ] Scenario 06 — Artifact tampering

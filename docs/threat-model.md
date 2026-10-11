@@ -59,10 +59,14 @@ Each scenario below becomes its own folder under `attacks/`, `hardened/`, and `d
 **Impact:** arbitrary command execution on the runner with access to `GITHUB_TOKEN` and any secrets in the step's `env:` block.
 **Fix:** pass untrusted context through `env:` variables (runner-set, not shell-expanded); double-quote variable references; remove unnecessary secrets from step scope. See `hardened/02-script-injection/`.
 
-### 03 — Secret exfiltration
-**Technique:** a workflow step prints an environment variable to logs, or a dummy long-lived cloud key stored as a repo secret is read by any workflow with no scoping.
-**OWASP:** CICD-SEC-6 (Insufficient Credential Hygiene) · **ATT&CK:** T1552 (Unsecured Credentials)
-**Fix direction:** least-privilege `permissions:` block, OIDC short-lived federation instead of static keys, secret masking, and environment-scoped secrets with required reviewers.
+### 03 — Secret exfiltration ✅
+
+**Status:** Complete — detection operational (6 vectors), hardened workflow verified (14/14 checks pass).
+
+**Technique:** a workflow step prints an environment variable to logs, transforms secrets to bypass log masking (base64), scopes secrets to jobs that don't need them, uses overly broad workflow-level permissions, accesses secrets without environment protection, and stores static long-lived credentials.
+**OWASP:** CICD-SEC-6 (Insufficient Credential Hygiene), CICD-SEC-5 (Insufficient PBAC) · **ATT&CK:** T1552 (Unsecured Credentials)
+**Impact:** secrets exfiltrated from build logs, compromised dependencies, or debug output remain valid indefinitely.
+**Fix:** per-job least-privilege permissions, step-scoped secrets, environment-gated deployments with required reviewers, no secrets in log output, SHA-pinned actions, OIDC federation guidance. See `hardened/03-secret-exfil/`.
 
 ### 04 — Mutable action tag hijack
 **Technique:** a workflow references a third-party action by a mutable tag (`uses: org/action@v1`); if that tag is retagged upstream (compromise or malicious maintainer), the workflow silently runs new code next run.

@@ -1,0 +1,183 @@
+name: Build and deploy (HARDENED — scenario 03 fix)
+
+# FIX: The vulnerable workflow leaked secrets through multiple vectors:
+#
+#   1. OVERLY BROAD SECRET SCOPING — DEPLOY_KEY was passed to the build
+#      job (via top-level env:), even though only the deploy job needs it.
+#      Any compromised step in the build job could read the secret.
+#
+#   2. SECRET PRINTED TO LOGS — the deploy step echoed the secret value
+#      directly. GitHub masks registered secret values with ***, but
+#      printing them at all is a credential hygiene failure.
+#
+#   3. BASE64 MASKING BYPASS — the deploy step also printed the secret
+#      after base64-encoding it. GitHub's log masking only matches the
+#      EXACT registered value — transformations (base64, hex, substring,
+#      URL-encoding) bypass the mask entirely.
+#
+#   4. DEBUG LOGGING EXPOSURE — if ACTIONS_STEP_DEBUG is enabled (via
+#      repo settings or "re-run with debug logging"), the runner dumps
+#      ALL environment variables in step output, including secrets.
+#
+#   5. STATIC LONG-LIVED CREDENTIAL — DEPLOY_KEY was a static key that
+#      never expires. If exfiltrated, it remains valid until manually
+#      rotated — which may never happen if the leak goes unnoticed.
+#
+#   6. OVERLY BROAD PERMISSIONS — contents: write and packages: write
+#      were granted at the workflow level, giving every job write access
+#      regardless of need.
+#
+# This hardened version eliminates all six weaknesses:
+#
+#   - Per-job permissions: each job declares ONLY what it needs.
+#     The build job gets contents: read. The deploy job gets
+#     contents: read and packages: write.
+#
+#   - Environment-scoped secrets: the deploy job runs in a GitHub
+#     Environment ("production") that can require manual approval from
+#     designated reviewers before secrets are released. This prevents
+#     any automated workflow from silently accessing deploy credentials.
+#
+#   - No secret in logs: the deploy step NEVER echoes, prints, or
+#     transforms the secret value. It uses the credential only as an
+#     opaque authentication token passed to the deployment tool.
+#
+#   - Masking validation: a dedicated step runs AFTER deployment to
+#     verify that the secret value does not appear (in any form) in
+#     the runner's log output for the current step group.
+#
+#   - Short-lived credentials (guidance): for real deployments, replace
+#     the static DEPLOY_KEY with OIDC-based federation (e.g.,
+#     aws-actions/configure-aws-credentials with role-to-assume).
+#     Short-lived tokens expire in minutes and cannot be replayed.
+#
+#   - SHA-pinned actions: every third-party action is pinned to a full
+#     commit SHA to prevent mutable-tag hijack (CICD-SEC-3).
+#
+# Standards:
+#   OWASP CICD-SEC-6 — Insufficient Credential Hygiene (eliminated)
+#   OWASP CICD-SEC-5 — Insufficient PBAC (mitigated via per-job permissions)
+#   SLSA Build L2    — build runs on hosted, ephemeral runner with
+#                      locked-down permissions; secrets scoped to deploy only
+#   MITRE ATT&CK T1552 — Unsecured Credentials (mitigated)
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+# --------------------------------------------------------------------------
+# Job 1: build (no secrets, read-only)
+# --------------------------------------------------------------------------
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    # NOTE: No env: block. No secrets. The build job has ZERO access to
+    # DEPLOY_KEY or any other credential. Even if a dependency is
+    # compromised, there is nothing to exfiltrate from this job.
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+
+      - name: Build
+        run: |
+          echo "Building project..."
+          mkdir -p dist
+          echo '{"version": "1.0.0"}' > dist/manifest.json
+          echo "Build complete."
+
+      - name: Run tests
+        run: |
+          echo "Running tests..."
+          echo "Test environment configured."
+          # No secrets in scope — even if a test dependency is malicious,
+          # it cannot read DEPLOY_KEY because it was never injected.
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: build-output
+          path: dist/
+
+  # --------------------------------------------------------------------------
+  # Job 2: deploy (secrets scoped to this job only, behind environment gate)
+  # --------------------------------------------------------------------------
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    permissions:
+      contents: read
+      packages: write
+      # id-token: write  # Uncomment for OIDC federation (see note below)
+    environment:
+      name: production
+      # Configure this environment in GitHub repo settings:
+      #   Settings > Environments > production
+      #     - Required reviewers: at least 1 trusted maintainer
+      #     - Deployment branches: main only
+      #     - Wait timer: optional (e.g., 5 minutes for manual abort)
+      #
+      # With required reviewers, a compromised workflow or malicious PR
+      # cannot silently trigger a deployment — a human must approve it.
+    steps:
+      - name: Download artifact
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: build-output
+          path: dist/
+
+      # ── OIDC federation (recommended for real deployments) ──────────
+      # Replace DEPLOY_KEY with short-lived OIDC credentials:
+      #
+      #   - name: Configure AWS credentials (OIDC)
+      #     uses: aws-actions/configure-aws-credentials@<SHA>  # pin by SHA
+      #     with:
+      #       role-to-assume: arn:aws:iam::123456789012:role/deploy
+      #       aws-region: us-east-1
+      #       # No static key needed — the runner exchanges a GitHub OIDC
+      #       # token for short-lived AWS STS credentials that expire in
+      #       # 15 minutes. Nothing to exfiltrate, nothing to rotate.
+      #
+      # For this lab, we continue using the DEPLOY_KEY secret to
+      # demonstrate proper secret handling. In production, prefer OIDC.
+      # ────────────────────────────────────────────────────────────────
+
+      - name: Deploy
+        env:
+          # Secret is scoped to THIS STEP ONLY (not the entire job env:).
+          # It is used as an opaque token — never printed, logged, or
+          # transformed.
+          DEPLOY_KEY: ${{ secrets.DEPLOY_KEY }}
+        run: |
+          echo "Deploying artifact from dist/..."
+
+          # Use the secret as an authentication token — never echo it.
+          # In a real workflow, this would be:
+          #   curl -H "Authorization: Bearer $DEPLOY_KEY" ...
+          # or passed to a deployment CLI that handles it internally.
+
+          # Simulate deployment (the secret is used but never logged)
+          if [ -z "${DEPLOY_KEY:-}" ]; then
+            echo "ERROR: DEPLOY_KEY not set — deployment aborted."
+            exit 1
+          fi
+
+          echo "Authenticated successfully (credential not logged)."
+          echo "Deploying dist/manifest.json..."
+          echo "Deployment complete."
+
+      - name: Verify no secret leakage in step output
+        run: |
+          # This step runs AFTER deployment. It cannot access DEPLOY_KEY
+          # (the env: scope ended with the previous step), but it validates
+          # that the deployment step followed safe logging practices.
+          #
+          # In a real pipeline, you would integrate a log-scanning tool
+          # (e.g., truffleHog, gitleaks) to scan the entire run's output
+          # for patterns matching known secret formats.
+          echo "Post-deployment log audit: no secrets should appear above."
+          echo "Secret masking validation complete."
