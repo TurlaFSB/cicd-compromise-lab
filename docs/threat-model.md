@@ -41,16 +41,23 @@ Nothing in this system touches a real cloud account, a real secret, or infrastru
 
 Each scenario below becomes its own folder under `attacks/`, `hardened/`, and `detections/`, with a write-up appended to this file as it's built.
 
-### 01 — Pwn request
+### 01 — Pwn request ✅
+
+**Status:** Complete — attack executed, detection operational, hardened workflow verified (10/10 checks pass).
+
 **Technique:** a workflow triggered on `pull_request_target` (which runs with write permissions and repo secrets) checks out and executes the PR's own code.
 **OWASP:** CICD-SEC-4 (Poisoned Pipeline Execution) · **ATT&CK:** T1195 (Supply Chain Compromise)
 **Impact:** attacker-controlled code runs with maintainer-level token and secret access.
-**Fix direction:** never check out PR head code under `pull_request_target`; use `pull_request` for untrusted code, or split into a privileged/unprivileged job pair with an explicit approval gate.
+**Fix:** split-job architecture — unprivileged `pull_request` job runs PR code with no secrets; privileged `pull_request_target` job posts status but never checks out code. All actions SHA-pinned. See `hardened/01-pwn-request/`.
 
-### 02 — Script injection via PR/issue title
+### 02 — Script injection via PR/issue title ✅
+
+**Status:** Complete — detection operational, hardened workflow verified (11/11 checks pass).
+
 **Technique:** untrusted text (PR title, issue title, branch name) is interpolated directly into a `run:` shell step instead of passed as an environment variable.
-**OWASP:** CICD-SEC-4, CICD-SEC-1 (Insufficient Flow Control) · **ATT&CK:** T1059 (Command and Scripting Interpreter)
-**Fix direction:** never interpolate `github.event.*` fields into `run:` blocks; pass them through `env:` and reference as `$VAR`.
+**OWASP:** CICD-SEC-4, CICD-SEC-1 (Insufficient Flow Control) · **ATT&CK:** T1059.004 (Unix Shell)
+**Impact:** arbitrary command execution on the runner with access to `GITHUB_TOKEN` and any secrets in the step's `env:` block.
+**Fix:** pass untrusted context through `env:` variables (runner-set, not shell-expanded); double-quote variable references; remove unnecessary secrets from step scope. See `hardened/02-script-injection/`.
 
 ### 03 — Secret exfiltration
 **Technique:** a workflow step prints an environment variable to logs, or a dummy long-lived cloud key stored as a repo secret is read by any workflow with no scoping.

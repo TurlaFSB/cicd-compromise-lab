@@ -13,7 +13,7 @@ references:
   - https://owasp.org/www-project-top-10-ci-cd-security-risks/CICD-SEC-04-Poisoned-Pipeline-Execution
   - https://attack.mitre.org/techniques/T1059/004/
 author: TurlaFSB/cicd-compromise-lab
-date: 2024/10/11
+date: 2026/10/11
 tags:
   - attack.execution
   - attack.t1059.004

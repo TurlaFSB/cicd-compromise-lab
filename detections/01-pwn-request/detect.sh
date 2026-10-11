@@ -60,7 +60,7 @@ detect_static() {
     base=$(basename "$wf")
 
     # Check 1: does the workflow trigger on pull_request_target?
-    if ! grep -qE '^\s*pull_request_target\s*:?' "$wf"; then
+    if ! grep -qE '^[[:space:]]*pull_request_target[[:space:]]*:?' "$wf"; then
       continue
     fi
 
@@ -78,7 +78,7 @@ detect_static() {
 
     # Check 3: does it execute code after checkout (run: steps)?
     local has_run_step=0
-    if grep -qE '^\s+run:\s' "$wf"; then
+    if grep -qE '^[[:space:]]+run:[[:space:]]' "$wf"; then
       has_run_step=1
     fi
 
@@ -86,7 +86,7 @@ detect_static() {
       finding "$base: VULNERABLE — pull_request_target + PR head checkout + code execution."
       echo "  Trigger:  pull_request_target"
       echo "  Checkout: $(grep -nE 'github\.event\.pull_request\.head\.(sha|ref)|github\.head_ref' "$wf" | head -1)"
-      echo "  Executes: $(grep -nE '^\s+run:\s' "$wf" | head -1)"
+      echo "  Executes: $(grep -nE '^[[:space:]]+run:[[:space:]]' "$wf" | head -1)"
       echo ""
     else
       warn "$base: pull_request_target + PR head checkout but no run: step found. Review manually."
