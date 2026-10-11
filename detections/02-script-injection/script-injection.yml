@@ -1,0 +1,73 @@
+title: GitHub Actions script injection via template expansion
+id: c4e7a2d1-9f3b-4e8a-b6c5-d2a1f0e3b4c7
+status: experimental
+description: >
+  Detects GitHub Actions workflows that interpolate untrusted context values
+  (issue titles, PR titles, commit messages, branch names, etc.) directly into
+  run: shell steps via ${{ }} template expansion. GitHub Actions performs this
+  expansion as a literal string substitution before the shell parses the line,
+  so attacker-controlled input containing shell metacharacters executes as code.
+references:
+  - https://securitylab.github.com/resources/github-actions-preventing-pwn-requests/
+  - https://docs.github.com/en/actions/security-for-github-actions/security-guides/security-hardening-for-github-actions#understanding-the-risk-of-script-injections
+  - https://owasp.org/www-project-top-10-ci-cd-security-risks/CICD-SEC-04-Poisoned-Pipeline-Execution
+  - https://attack.mitre.org/techniques/T1059/004/
+author: TurlaFSB/cicd-compromise-lab
+date: 2024/10/11
+tags:
+  - attack.execution
+  - attack.t1059.004
+  - cicd_sec.4
+  - cicd_sec.1
+logsource:
+  category: github_actions_workflow
+  product: github
+detection:
+  # Condition 1: The workflow has a run: step (shell execution)
+  has_run_step:
+    field: steps.run
+    exists: true
+
+  # Condition 2: An untrusted context is interpolated in a run: step.
+  # These are the GitHub Actions contexts that contain attacker-controlled data.
+  untrusted_context_in_run:
+    field: steps.run
+    contains|any:
+      # Issue events
+      - "github.event.issue.title"
+      - "github.event.issue.body"
+      - "github.event.issue.user.login"
+      # Pull request events
+      - "github.event.pull_request.title"
+      - "github.event.pull_request.body"
+      - "github.event.pull_request.head.ref"
+      - "github.event.pull_request.head.label"
+      - "github.event.pull_request.head.repo.default_branch"
+      # Discussion events
+      - "github.event.discussion.title"
+      - "github.event.discussion.body"
+      # Comment events
+      - "github.event.comment.body"
+      - "github.event.review.body"
+      - "github.event.review_comment.body"
+      # Commit metadata
+      - "github.event.head_commit.message"
+      - "github.event.head_commit.author.name"
+      - "github.event.head_commit.author.email"
+      - "github.event.commits[0].message"
+      # Branch names
+      - "github.head_ref"
+      - "github.event.workflow_run.head_branch"
+      # Page events
+      - "github.event.pages[0].page_name"
+
+  condition: has_run_step and untrusted_context_in_run
+
+falsepositives:
+  - >
+    Workflows that pass untrusted context through an intermediate environment
+    variable (env: TITLE: ${{ github.event.issue.title }}) are safe — the
+    scanner may report them if the ${{ }} expression also appears in a run:
+    block. The detection script (detect.sh) handles this by checking whether
+    the expression is inside a run: block versus an env: mapping.
+level: high
