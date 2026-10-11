@@ -1,0 +1,53 @@
+title: GitHub Actions — pull_request_target workflow checks out PR head code
+id: c1cd-01-pwn-request
+status: stable
+description: >
+  Detects a GitHub Actions workflow triggered by pull_request_target that
+  checks out the pull request's head commit (attacker-controlled code)
+  rather than the base branch. This is the "pwn request" pattern
+  (CICD-SEC-4): the workflow runs with the base repo's GITHUB_TOKEN and
+  secrets, but executes code the PR author controls.
+
+  This rule inspects workflow definition files (static analysis), not
+  runtime logs. Pair it with the API query in detect.sh to catch the
+  pattern at both author time and run time.
+author: TurlaFSB/cicd-compromise-lab
+date: 2026/10/11
+references:
+  - https://owasp.org/www-project-top-10-ci-cd-security-risks/CICD-SEC-04-Poisoned-Pipeline-Execution
+  - https://securitylab.github.com/resources/github-actions-preventing-pwn-requests/
+  - https://github.com/TurlaFSB/cicd-compromise-lab/blob/main/attacks/01-pwn-request/README.md
+tags:
+  - attack.t1195
+  - attack.initial_access
+  - cicd_sec.4
+logsource:
+  category: cicd
+  product: github_actions
+  # This rule is designed for static analysis of workflow YAML files.
+  # It can be applied by tools that parse .github/workflows/*.yml and
+  # emit structured findings (e.g., zizmor, actionlint, custom scanners).
+  # For runtime detection against the Actions API, see detect.sh.
+detection:
+  trigger_pull_request_target:
+    # Workflow triggers on pull_request_target
+    workflow.on|contains: 'pull_request_target'
+  checkout_pr_head:
+    # A checkout step references the PR's head SHA — attacker-controlled
+    step.uses|startswith: 'actions/checkout'
+    step.with.ref|contains:
+      - 'github.event.pull_request.head.sha'
+      - 'github.event.pull_request.head.ref'
+      - '${{ github.head_ref }}'
+  executes_code:
+    # The job runs shell commands after checkout (npm, make, pip, etc.)
+    step.run|exists: true
+  condition: trigger_pull_request_target and checkout_pr_head and executes_code
+falsepositives:
+  - Workflows that check out PR code under pull_request_target but run it
+    in a sandboxed container with no secrets and no write token. These are
+    rare and should still be flagged for review.
+  - Workflows that check out PR code only to read static files (e.g.,
+    extracting a version string) without executing anything. These should
+    be refactored to use the API instead.
+level: critical

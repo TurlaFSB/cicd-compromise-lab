@@ -1,0 +1,95 @@
+name: CI (HARDENED — scenario 01 fix)
+
+# FIX: The vulnerable workflow used pull_request_target to check out and
+# execute the PR author's code with the base repo's GITHUB_TOKEN and secrets.
+# That is the "pwn request" pattern (CICD-SEC-4).
+#
+# This hardened version splits the pipeline into two jobs:
+#
+#   1. "test" — triggered by plain `pull_request`. It checks out and runs
+#      the PR's code, but gets only a read-only token scoped to the PR and
+#      has NO access to repo secrets. Untrusted code is contained here.
+#
+#   2. "label" — triggered by `pull_request_target`, which does run with
+#      the base repo's token and secrets. But it NEVER checks out or
+#      executes PR code — it only reads trusted event metadata (the PR
+#      number, labels) to post a status comment. There is nothing for an
+#      attacker to inject.
+#
+# Why not a single pull_request_target with an approval gate?
+# Environment-based required-reviewer gates work, but they rely on a human
+# not rubber-stamping — defense in depth means the workflow itself should
+# be structured so that untrusted code never has secrets, period.
+#
+# Standards:
+#   OWASP CICD-SEC-4 — Poisoned Pipeline Execution (eliminated)
+#   SLSA Build L2    — build runs on a hosted, ephemeral runner with
+#                      locked-down permissions; no user-controlled code
+#                      runs with elevated privileges
+#   MITRE ATT&CK T1195 — Supply Chain Compromise (mitigated)
+#
+# Every third-party action is pinned to a full commit SHA, not a mutable
+# tag (CICD-SEC-3 defense), with the tag noted in a comment for humans.
+
+on:
+  pull_request:
+    branches: [main]
+  pull_request_target:
+    branches: [main]
+
+# --------------------------------------------------------------------------
+# Job 1: test (unprivileged)
+# Triggered by: pull_request (NOT pull_request_target)
+# Permissions: read-only, no secrets
+# --------------------------------------------------------------------------
+jobs:
+  test:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout PR code
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        # Safe: pull_request gives a read-only token; no secrets in scope.
+        # The PR code can run here without risk to the base repo.
+
+      - name: Set up Node.js
+        uses: actions/setup-node@39370e3970a6d050c480ffad4ff0ed4d3fdee5af # v4.1.0
+        with:
+          node-version: 20
+
+      - name: Install dependencies
+        run: npm ci || npm install
+
+      - name: Run tests
+        run: npm test
+        # No GITHUB_TOKEN with write permissions, no DUMMY_CLOUD_KEY, no
+        # secrets of any kind are passed here. If a malicious test tries
+        # to read process.env.DUMMY_CLOUD_KEY, it gets undefined.
+
+  # --------------------------------------------------------------------------
+  # Job 2: label (privileged but never runs PR code)
+  # Triggered by: pull_request_target
+  # Permissions: pull-requests write (to post a comment), nothing else
+  # --------------------------------------------------------------------------
+  label:
+    if: github.event_name == 'pull_request_target'
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write
+    steps:
+      # IMPORTANT: no actions/checkout here. We never check out the PR's
+      # code. This job only uses trusted event metadata from the webhook.
+      - name: Post status comment
+        uses: actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea # v7.0.1
+        with:
+          script: |
+            const prNumber = context.payload.pull_request.number;
+            const runUrl = `https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: prNumber,
+              body: `CI run started: ${runUrl}\n\nThis comment was posted by the \`pull_request_target\` job, which has write access but **never checks out or executes PR code**.`
+            });
