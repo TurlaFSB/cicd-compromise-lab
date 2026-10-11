@@ -1,0 +1,10 @@
+# Intentionally vulnerable fixture used by the action self-test.
+# It is never executed: GitHub only runs workflows from the repository root.
+name: fixture
+on: push
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: some-org/some-action@main

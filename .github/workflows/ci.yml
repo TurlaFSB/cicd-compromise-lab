@@ -55,3 +55,31 @@ jobs:
 
       - name: Run lab scanners against this repository's own workflows
         run: ./lab scan .
+
+  action-selftest:
+    name: Action wrapper self-test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+
+      - name: Action passes on this repository
+        uses: ./
+
+      - name: Action reports findings on a known-vulnerable workflow
+        id: vulnerable
+        uses: ./
+        with:
+          path: tests/fixtures/vulnerable
+          fail-on-findings: "false"
+
+      - name: Assert the vulnerable fixture was flagged
+        env:
+          FINDINGS: ${{ steps.vulnerable.outputs.findings }}
+        run: |
+          if [ "${FINDINGS:-0}" -lt 1 ]; then
+            echo "::error::wrapper failed to flag the vulnerable fixture"
+            exit 1
+          fi

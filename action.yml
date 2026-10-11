@@ -1,0 +1,84 @@
+name: CI/CD Compromise Lab Scanner
+description: Scan a repository's GitHub Actions workflows for pwn requests, script injection, secret exfiltration and mutable action tags.
+author: TurlaFSB
+
+branding:
+  icon: shield
+  color: blue
+
+inputs:
+  path:
+    description: Path to the repository checkout to scan, relative to the workspace.
+    required: false
+    default: "."
+  skip-official:
+    description: Do not flag actions/* and github/* references in the mutable-tag check.
+    required: false
+    default: "false"
+  fail-on-findings:
+    description: Fail the step when any scanner reports a finding.
+    required: false
+    default: "true"
+
+outputs:
+  findings:
+    description: Number of scanners that reported findings.
+    value: ${{ steps.scan.outputs.findings }}
+
+runs:
+  using: composite
+  steps:
+    - name: Scan workflows
+      id: scan
+      shell: bash
+      # Inputs go through env: and are never interpolated into the script,
+      # the same rule scenario 02 teaches.
+      env:
+        INPUT_PATH: ${{ inputs.path }}
+        INPUT_SKIP_OFFICIAL: ${{ inputs.skip-official }}
+        INPUT_FAIL: ${{ inputs.fail-on-findings }}
+        LAB: ${{ github.action_path }}/lab
+      run: |
+        set -uo pipefail
+
+        target="${GITHUB_WORKSPACE}/${INPUT_PATH}"
+        args=("$target")
+        if [ "$INPUT_SKIP_OFFICIAL" = "true" ]; then args+=(--skip-official); fi
+
+        report="$(mktemp)"
+        rc=0
+        "$LAB" scan "${args[@]}" >"$report" 2>&1 || rc=$?
+
+        # Strip terminal colour codes for logs and the job summary.
+        sed -i 's/\x1b\[[0-9;]*m//g' "$report"
+
+        # One workflow annotation per finding, so they show on the run page.
+        grep 'FINDING:' "$report" | sed 's/^FINDING: //' | while IFS= read -r msg; do
+          echo "::error title=CI/CD Compromise Lab::${msg}"
+        done
+
+        flagged="$(grep -oE '[0-9]+ flagged' "$report" | tail -1 | grep -oE '[0-9]+' || true)"
+        echo "findings=${flagged:-0}" >> "$GITHUB_OUTPUT"
+
+        {
+          echo "### CI/CD Compromise Lab scan"
+          echo
+          echo '```'
+          sed -n '/=== Scan summary/,$p' "$report"
+          echo '```'
+          if [ "$rc" -eq 1 ]; then
+            echo
+            echo "Run \`./lab pin .\` from a checkout of the lab to preview SHA-pinning fixes."
+          fi
+        } >> "$GITHUB_STEP_SUMMARY"
+
+        cat "$report"
+
+        if [ "$rc" -eq 2 ]; then
+          echo "::error::Scanner error (exit 2). See log above."
+          exit 2
+        fi
+        if [ "$rc" -eq 1 ] && [ "$INPUT_FAIL" = "true" ]; then
+          exit 1
+        fi
+        exit 0

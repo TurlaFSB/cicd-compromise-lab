@@ -153,6 +153,42 @@ The `lab` script is the single entry point for everything below:
 
 `./lab scan` exits `1` when any scanner reports a finding, so it drops straight into CI as a gate. Scenario scanners are discovered automatically, so new scenarios appear in `list`, `scan` and `verify` with no extra wiring.
 
+### Protect your own repository
+
+**Scan every pull request** by adding the lab as a step in your workflow. Pin it to a full commit SHA, like any other third-party action:
+
+```yaml
+# .github/workflows/lab-scan.yml
+name: Workflow security scan
+on: [pull_request]
+permissions:
+  contents: read
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@<full-commit-sha> # vX.Y.Z
+        with:
+          persist-credentials: false
+      - uses: TurlaFSB/cicd-compromise-lab@<full-commit-sha>
+        with:
+          skip-official: "false"     # also flag actions/* and github/*
+          fail-on-findings: "true"   # fail the check when anything is found
+```
+
+Findings appear as annotations on the run and in the job summary. The step output `findings` holds the number of scanners that reported something.
+
+**Fix unpinned actions** with `lab pin`, which resolves every tag or branch reference to its full commit SHA and keeps the tag as a comment:
+
+```bash
+./lab pin /path/to/your/repo           # dry run: prints a diff, changes nothing
+./lab pin /path/to/your/repo --write   # apply the change
+```
+
+Pinning locks in whatever each tag points at *right now*. If an upstream tag was already tampered with, you would pin the bad commit, so review the diff first. References that cannot be resolved are left unchanged and make the command exit non-zero. Fixes for script injection and pwn requests are deliberately not automated, because they need a human to decide what the workflow should do; the scanner points at the hardened example instead.
+
+> The scanners are pattern-based (grep and awk). They will miss things and occasionally flag harmless code. Treat them as a teaching tool and a first-pass gate, and run [`zizmor`](https://github.com/woodruffw/zizmor) or [`actionlint`](https://github.com/rhysd/actionlint) alongside them for deeper analysis.
+
 ### Prerequisites
 
 - `bash` 4+, `awk`, `grep` (standard on any Unix system)

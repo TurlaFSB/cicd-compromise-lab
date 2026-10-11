@@ -5,6 +5,7 @@
 #   ./lab list                              list scenarios and their status
 #   ./lab scan <path> [--skip-official]     run every scenario scanner against a local repo
 #   ./lab scan --repo <owner/repo>          run every scanner against a remote repo (needs gh)
+#   ./lab pin <path> [--write]              resolve action tags/branches to commit SHAs (diff only unless --write)
 #   ./lab verify [scenario-id|all]          prove the hardened workflows resist the attacks
 #   ./lab doctor                            check that required tools are installed
 #   ./lab help                              show this help
@@ -29,7 +30,7 @@ NC='\033[0m'
 die() { echo -e "${RED}ERROR:${NC} $*" >&2; exit 2; }
 
 usage() {
-  sed -n '2,15p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'
+  sed -n '2,16p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'
 }
 
 # Print scenario directory names (e.g. 01-pwn-request), sorted.
@@ -165,7 +166,91 @@ cmd_verify() {
   exit "$status"
 }
 
+# Resolve a tag or branch of owner/repo to a full commit SHA (annotated tags are
+# peeled to the commit). Prints the SHA, or nothing if it cannot be resolved.
+resolve_ref() {
+  local repo="$1" ref="$2" out sha
+  out=$(GIT_TERMINAL_PROMPT=0 git ls-remote "https://github.com/$repo.git" \
+    "refs/tags/$ref" "refs/tags/$ref^{}" "refs/heads/$ref" 2>/dev/null) || return 0
+  sha=$(awk -v r="refs/tags/$ref^{}" '$2 == r { print $1; exit }' <<<"$out")
+  [ -n "$sha" ] || sha=$(awk -v t="refs/tags/$ref" -v h="refs/heads/$ref" '$2 == t || $2 == h { print $1; exit }' <<<"$out")
+  echo "$sha"
+}
+
+cmd_pin() {
+  local target="" write=0
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      --write) write=1; shift ;;
+      -*) die "unknown option: $1" ;;
+      *) target="$1"; shift ;;
+    esac
+  done
+  [ -n "$target" ] || die "usage: ./lab pin <path-to-repo> [--write]"
+  local wf_dir="$target/.github/workflows"
+  [ -d "$wf_dir" ] || die "no .github/workflows directory at $target"
+  command -v git >/dev/null 2>&1 || die "pin needs git"
+
+  local re='^([[:space:]]*-?[[:space:]]*uses:[[:space:]]*)([^[:space:]@"'"'"']+)@([^[:space:]#"'"'"']+)(.*)$'
+  local sha40='^[0-9a-f]{40}$'
+  local -A cache=()
+  local changed=0 unresolved=0 wf tmp
+
+  for wf in "$wf_dir"/*.yml "$wf_dir"/*.yaml; do
+    [ -f "$wf" ] || continue
+    tmp=$(mktemp)
+    local base line prefix name ref rest repo key sha
+    base=$(basename "$wf")
+    while IFS= read -r line || [ -n "$line" ]; do
+      if [[ ! "$line" =~ ^[[:space:]]*# ]] && [[ "$line" =~ $re ]]; then
+        prefix="${BASH_REMATCH[1]}"; name="${BASH_REMATCH[2]}"
+        ref="${BASH_REMATCH[3]}"; rest="${BASH_REMATCH[4]}"
+        if [[ "$name" == ./* || "$name" == docker://* || "$ref" =~ $sha40 ]]; then
+          printf '%s\n' "$line" >>"$tmp"; continue
+        fi
+        repo=$(cut -d/ -f1,2 <<<"$name")
+        key="$repo@$ref"
+        if [ -z "${cache[$key]+x}" ]; then cache[$key]=$(resolve_ref "$repo" "$ref"); fi
+        sha="${cache[$key]}"
+        if [ -z "$sha" ]; then
+          unresolved=$((unresolved + 1))
+          echo -e "${YELLOW}unresolved:${NC} ${base}: $name@$ref (repo or ref not reachable; left unchanged)" >&2
+          printf '%s\n' "$line" >>"$tmp"
+        elif [[ "$rest" =~ \# ]]; then
+          printf '%s\n' "${prefix}${name}@${sha}${rest}" >>"$tmp"
+        else
+          printf '%s\n' "${prefix}${name}@${sha} # ${ref}${rest}" >>"$tmp"
+        fi
+      else
+        printf '%s\n' "$line" >>"$tmp"
+      fi
+    done <"$wf"
+
+    if ! diff -q "$wf" "$tmp" >/dev/null; then
+      changed=$((changed + 1))
+      diff -u --label "a/$base" --label "b/$base" "$wf" "$tmp" || true
+      if [ "$write" -eq 1 ]; then cp "$tmp" "$wf"; fi
+    fi
+    rm -f "$tmp"
+  done
+
+  echo
+  if [ "$changed" -eq 0 ] && [ "$unresolved" -eq 0 ]; then
+    echo -e "${GREEN}Nothing to pin:${NC} every action reference is already a full commit SHA."
+    return
+  fi
+  if [ "$write" -eq 1 ]; then
+    echo "Pinned references in $changed workflow file(s); $unresolved unresolved."
+  else
+    echo "Dry run: $changed workflow file(s) would change; $unresolved unresolved. Re-run with --write to apply."
+  fi
+  echo -e "${YELLOW}Review before merging:${NC} pinning locks in whatever each tag points at *right now*."
+  echo "If an upstream tag was already tampered with, you would be pinning the bad commit."
+  [ "$unresolved" -eq 0 ] || exit 1
+}
+
 case "${1:-help}" in
+  pin)     shift; cmd_pin "$@" ;;
   list)    cmd_list ;;
   scan)    shift; cmd_scan "$@" ;;
   verify)  shift; cmd_verify "$@" ;;

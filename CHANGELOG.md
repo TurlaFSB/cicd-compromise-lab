@@ -5,6 +5,8 @@ All notable changes to this project are documented here. The format follows [Kee
 ## [Unreleased]
 
 ### Added
+- Composite GitHub Action (`action.yml`) that runs every scenario scanner on a repository, with per-finding annotations, a job summary, and a `findings` output. Covered by a self-test job in CI.
+- `lab pin`: resolves action tags and branches to full commit SHAs, dry-run by default, idempotent, leaves unresolvable references untouched.
 - `lab` command-line entry point: `list`, `scan` (local or remote repos, aggregated summary and exit code), `verify`, and `doctor`. Scenarios are auto-discovered.
 - **Scenario 04 — mutable action tag hijack:** vulnerable workflow, five-vector scanner (`--skip-official` support), Sigma rule, SHA-pinned hardened workflow, 12 verification checks.
 - Community health files: `LICENSE` (MIT), `SECURITY.md`, `CODE_OF_CONDUCT.md`, `CONTRIBUTING.md`, `CITATION.cff`.
