@@ -5,6 +5,7 @@ All notable changes to this project are documented here. The format follows [Kee
 ## [Unreleased]
 
 ### Added
+- **Scenario 05 — cache poisoning:** vulnerable writer/victim workflow pair, five-vector job-aware scanner, offline cache-scoping simulation, Sigma rule, hardened read-only/content-bound workflows, 12 verification checks.
 - Composite GitHub Action (`action.yml`) that runs every scenario scanner on a repository, with per-finding annotations, a job summary, and a `findings` output. Covered by a self-test job in CI.
 - `lab pin`: resolves action tags and branches to full commit SHAs, dry-run by default, idempotent, leaves unresolvable references untouched.
 - `lab` command-line entry point: `list`, `scan` (local or remote repos, aggregated summary and exit code), `verify`, and `doctor`. Scenarios are auto-discovered.
@@ -22,7 +23,7 @@ All notable changes to this project are documented here. The format follows [Kee
 - Attack driver now commits as the maintainer's current identity; author email in captured scenario 01 evidence redacted.
 
 ### Planned
-- Scenarios 05–07 (cache poisoning, artifact tampering, self-hosted runner persistence).
+- Scenarios 06–07 (artifact tampering, self-hosted runner persistence).
 - Scenarios 08–10 (`GITHUB_ENV` injection, reusable workflow trust boundary, `GITHUB_TOKEN` over-privilege).
 - Scenarios 11–14 (`workflow_run` artifact poisoning, OIDC trust misconfiguration, credential leakage via artifacts, dependency confusion).
 - Unified scanner emitting SARIF, and an empirical scan of public repositories.

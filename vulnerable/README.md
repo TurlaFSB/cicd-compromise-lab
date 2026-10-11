@@ -10,7 +10,7 @@ Each scenario's intentionally vulnerable workflow lives in a separate public rep
 | 02 — Script injection | [`turla-lab-targets/script-injection-target`](https://github.com/turla-lab-targets/script-injection-target) | `.github/workflows/triage.yml` | `issues: opened` |
 | 03 — Secret exfiltration | `turla-lab-targets/secret-exfil-target` | `.github/workflows/deploy.yml` | `push` / `pull_request` |
 | 04 — Mutable action tag hijack | `turla-lab-targets/tag-hijack-target` | `.github/workflows/ci.yml` | `push` / `pull_request` |
-| 05 — Cache poisoning | TBD | TBD | TBD |
+| 05 — Cache poisoning | `turla-lab-targets/cache-poisoning-target` | `.github/workflows/pr-check.yml` + `release.yml` | `pull_request` / `push` |
 | 06 — Artifact tampering | TBD | TBD | TBD |
 
 ## Safety rules

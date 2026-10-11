@@ -1,0 +1,56 @@
+name: Release (HARDENED — scenario 05 fix)
+
+# FIX (victim side): the vulnerable release.yml restored a cache a fork PR
+# could write, with fuzzy restore-keys, then skipped a clean rebuild. This
+# version:
+#
+#   1. Caches only the pure download directory (~/.npm), keyed to the
+#      lockfile hash — never build output (node_modules/dist).
+#   2. Uses NO restore-keys, so only an exact, content-bound key matches.
+#   3. ALWAYS runs `npm ci` and `npm run build` from a clean checkout; the
+#      cache only speeds up downloads and can never substitute for the build.
+#   4. Keeps least-privilege, per-job permissions and step-scoped secrets.
+#
+# Even if an attacker could place an entry under this key (they cannot — it
+# is bound to the committed lockfile), the artifact is still built fresh from
+# source, so nothing from the cache is executed or published.
+#
+# OWASP CICD-SEC-9 — Improper Artifact Integrity Validation (eliminated)
+# MITRE ATT&CK T1195.002 — Compromise Software Supply Chain (mitigated)
+
+on:
+  push:
+    branches: [main]
+  release:
+    types: [published]
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    environment:
+      name: release
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@39370e3970a6d050c480ffad4ff0ed4d3fdee5af # v4.1.0
+        with:
+          node-version: 20
+
+      # Download cache only, exact content-bound key, no restore-keys.
+      - uses: actions/cache@5a3ec84eff668545956fd18022155c47e93e2684 # v4.2.3
+        with:
+          path: ~/.npm
+          key: npm-${{ runner.os }}-${{ hashFiles('**/package-lock.json') }}
+
+      # Always build from source — the cache never substitutes for these.
+      - run: npm ci
+      - run: npm run build
+
+      - run: npm publish
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

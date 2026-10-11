@@ -1,0 +1,61 @@
+# VULNERABLE — DO NOT USE IN PRODUCTION
+#
+# Scenario 05, part 2 of 2: the victim.
+#
+# This workflow runs on push to main and on release publication. It restores
+# the SAME cache key the fork-PR workflow (pr-check.yml) writes, then builds
+# and publishes a release artifact from whatever it restored.
+#
+# If an attacker's PR run populated `build-cache` with a tampered
+# node_modules/ or dist/, that poisoned content is restored here and baked
+# into the published artifact — a supply-chain compromise that reaches every
+# downstream consumer of the release. No merge, no review, no approval.
+#
+# OWASP CICD-SEC-9 (Improper Artifact Integrity Validation)
+# MITRE ATT&CK T1195.002 (Compromise Software Supply Chain)
+
+name: Release
+
+on:
+  push:
+    branches: [main]
+  release:
+    types: [published]
+
+permissions:
+  contents: write
+  packages: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@39370e3970a6d050c480ffad4ff0ed4d3fdee5af # v4.1.0
+        with:
+          node-version: 20
+
+      # VULNERABLE: restores a cache a fork PR can write. Worse, restore-keys
+      # fuzzy-matches any entry whose key starts with "build-", so even a
+      # near-miss attacker key is pulled into this privileged build.
+      - uses: actions/cache@5a3ec84eff668545956fd18022155c47e93e2684 # v4.2.3
+        with:
+          path: |
+            node_modules
+            dist
+          key: build-cache
+          restore-keys: |
+            build-
+
+      # If the cache was restored, npm ci and build are skipped as an
+      # "optimization" — the poisoned node_modules/ and dist/ are used as-is.
+      - run: |
+          if [ ! -d node_modules ]; then npm ci; fi
+          if [ ! -d dist ]; then npm run build; fi
+
+      - run: npm publish
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

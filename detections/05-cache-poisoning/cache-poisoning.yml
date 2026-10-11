@@ -1,0 +1,68 @@
+title: GitHub Actions Cache Poisoning via Shared or Untrusted-Writable Cache
+id: b8f2d4a6-5c3e-4e91-a7d2-6f9b0c1e3a4d
+status: experimental
+description: |
+  Detects GitHub Actions workflows where a build cache can be written by an
+  untrusted trigger (fork pull_request / pull_request_target) and restored by
+  a privileged one (push to a release branch, release, deployment), or where
+  the cache key is forgeable. GitHub scopes caches so that an entry written on
+  one ref is restorable by child refs and the default branch; a fork PR can
+  therefore seed a cache the trusted release build later restores, injecting
+  tampered dependencies or build output into a published artifact.
+
+  This rule fires on the workflow definition (YAML), not on runtime log
+  events — it is a static-analysis / policy-check rule.
+references:
+  - https://owasp.org/www-project-top-10-ci-cd-security-risks/CICD-SEC-09-Improper-Artifact-Integrity-Validation
+  - https://docs.github.com/en/actions/writing-workflows/choosing-what-your-workflow-does/caching-dependencies-to-speed-up-workflows#restrictions-for-accessing-a-cache
+  - https://docs.github.com/en/actions/security-for-github-actions/security-guides/security-hardening-for-github-actions
+author: TurlaFSB
+date: 2026-10-11
+tags:
+  - attack.t1195.002
+  - attack.supply_chain
+  - cicd_sec_9
+logsource:
+  category: ci_cd
+  product: github_actions
+  service: workflow_definition
+detection:
+  uses_readwrite_cache:
+    # actions/cache (writes on cache miss), but NOT actions/cache/restore
+    uses|re: 'uses:\s*actions/cache@'
+  is_restore_only:
+    uses|re: 'uses:\s*actions/cache/restore@'
+
+  trigger_untrusted:
+    on|re: '\b(pull_request|pull_request_target)\b'
+  trigger_privileged:
+    on|re: '\b(push|release|deployment)\b'
+
+  static_key:
+    # a key: line with no hashFiles() component
+    key|re: '^\s*key:\s*\S'
+  keyed_to_hash:
+    key|contains: 'hashFiles('
+
+  broad_restore_keys:
+    restore-keys|re: '^\s*restore-keys:'
+
+  executable_paths:
+    path|re: '\b(dist|build|out|bin|\.bin|\.venv|target)\b'
+
+  condition: >
+    uses_readwrite_cache and (
+      (trigger_untrusted and not is_restore_only) or
+      (trigger_privileged and broad_restore_keys) or
+      (static_key and not keyed_to_hash) or
+      executable_paths
+    )
+
+falsepositives:
+  - Caches isolated per trigger (distinct key prefixes for PR vs. release) are
+    safe even when both workflows cache; the scanner flags them for human review.
+  - Pure download caches (~/.npm, ~/.cache/pip) keyed to a lockfile hash are
+    low risk; the executable-paths vector will not fire on them.
+  - Monorepos that legitimately cache a build directory keyed to a full content
+    hash — verify the key cannot be forged by a fork PR.
+level: high

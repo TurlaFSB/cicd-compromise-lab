@@ -27,7 +27,7 @@ CI/CD pipelines hold secrets, publish artifacts, and deploy to production — ma
 | 02 | [Script injection via issue title](#scenario-02--script-injection) | CICD-SEC-4, CICD-SEC-1 | T1059.004 | Complete |
 | 03 | [Secret exfiltration](#scenario-03--secret-exfiltration) | CICD-SEC-6, CICD-SEC-5 | T1552 | Complete |
 | 04 | [Mutable action tag hijack](#scenario-04--mutable-action-tag-hijack) | CICD-SEC-3 | T1195.001 | Complete |
-| 05 | [Cache poisoning](#scenario-05--cache-poisoning) | CICD-SEC-9 | T1195.002 | Planned |
+| 05 | [Cache poisoning](#scenario-05--cache-poisoning) | CICD-SEC-9 | T1195.002 | Complete |
 | 06 | [Artifact tampering](#scenario-06--artifact-tampering) | CICD-SEC-9 | T1195 | Planned |
 | 07 | Self-hosted runner persistence | CICD-SEC-7 | T1053, T1547 | Planned |
 | 08 | `GITHUB_ENV` / `GITHUB_PATH` injection | CICD-SEC-4 | T1574 | Planned |
@@ -72,9 +72,11 @@ A workflow references third-party actions by mutable tags (`uses: org/action@v1`
 
 ### Scenario 05 — Cache poisoning
 
-A build cache keyed loosely enough that an attacker-controlled branch can poison entries later restored by trusted workflow runs.
+Two workflows share a build cache: one runs on `pull_request` (fork PRs), the other on push/release. The shared key is static (`build-cache`, no `hashFiles()`), the PR workflow can write it, and the release workflow restores it — including `node_modules/` and `dist/` — then skips a clean rebuild. A fork PR seeds the cache with tampered content that the release build publishes, with no merge required. GitHub's cache scoping lets a fork PR's entry be restored by the default-branch build.
 
-**Fix:** Scope cache keys tightly (include lockfile hash and branch). Never restore caches written by untrusted-trigger workflows into privileged runs.
+**Fix:** Read-only `actions/cache/restore` on untrusted triggers, keys bound to `hashFiles()` of the lockfile, no `restore-keys`, cache only downloads (`~/.npm`) not build output, and always rebuild from source in the release job. An offline cache-scoping simulation (`attacks/05-cache-poisoning/simulate.sh`) proves the vulnerable pair is poisonable and the hardened pair is not.
+
+**Verification:** 12/12 structural checks pass. Scanner catches five vectors on the vulnerable pair and clears the hardened one; simulation reports POISONED vs. SAFE.
 
 ### Scenario 06 — Artifact tampering
 
@@ -84,59 +86,39 @@ An artifact produced by the build job is modified before the release job consume
 
 ## Architecture
 
+Every scenario repeats the same four-folder layout, so the tree below shows
+one scenario in full and lists the rest. `<id>` is the scenario slug, e.g.
+`01-pwn-request` or `05-cache-poisoning`.
+
 ```
-cicd-compromise-lab/                    turla-lab-targets/ (separate org)
-├── attacks/                            ├── pwn-request-target/
-│   ├── 01-pwn-request/                 │   └── .github/workflows/ci.yml
-│   │   ├── attack.sh                   │
-│   │   ├── payload/                    ├── script-injection-target/
-│   │   └── evidence/                   │   └── .github/workflows/triage.yml
-│   ├── 02-script-injection/            │
-│   │   ├── README.md                   ├── secret-exfil-target/
-│   │   └── payload/                    │   └── .github/workflows/deploy.yml
-│   └── 04-tag-hijack/                  │
-│       ├── vulnerable-ci.yml           └── tag-hijack-target/
-│       └── payload/                        └── .github/workflows/ci.yml
-├── detections/
-│   ├── 01-pwn-request/
-│   │   ├── pwn-request.yml      ← Sigma rule
-│   │   ├── detect.sh            ← static + runtime scanner
-│   │   └── README.md
-│   ├── 02-script-injection/
-│   │   ├── script-injection.yml ← Sigma rule
-│   │   ├── detect.sh            ← static + runtime scanner
-│   │   └── README.md
-│   └── 04-tag-hijack/
-│       ├── tag-hijack.yml       ← Sigma rule (5 vectors)
-│       ├── detect.sh            ← static + runtime scanner
-│       └── README.md
-├── hardened/
-│   ├── 01-pwn-request/
-│   │   ├── ci.yml               ← hardened workflow
-│   │   └── README.md
-│   ├── 02-script-injection/
-│   │   ├── triage.yml           ← hardened workflow
-│   │   └── README.md
-│   └── 04-tag-hijack/
-│       ├── ci.yml               ← hardened workflow (all SHAs pinned)
-│       └── README.md
-├── verify/
-│   ├── 01-pwn-request/
-│   │   ├── verify.sh            ← 10 structural checks
-│   │   └── README.md
-│   ├── 02-script-injection/
-│   │   ├── verify.sh            ← 11 structural checks
-│   │   └── README.md
-│   └── 04-tag-hijack/
-│       ├── verify.sh            ← 12 structural checks
-│       └── README.md
-├── docs/
-│   └── threat-model.md
+cicd-compromise-lab/
+├── lab                          ← single CLI entry point (list/scan/pin/verify/doctor)
+├── action.yml                   ← reusable GitHub Action wrapper (scan on every PR)
+│
+├── attacks/<id>/                ← the vulnerable workflow(s), attack driver, payload, evidence
+│   └── README.md                  vulnerability write-up, attack path, MITRE/OWASP mapping
+├── detections/<id>/
+│   ├── <name>.yml               ← Sigma rule
+│   ├── detect.sh                ← static + runtime scanner
+│   └── README.md                  scanner usage, false positives, limitations
+├── hardened/<id>/               ← the fixed workflow(s)
+│   └── README.md                  before/after, defense layers, standards mapping
+├── verify/<id>/
+│   ├── verify.sh                ← structural checks + detection cross-check
+│   └── README.md                  what is verified, how to run, exit codes
+│
+├── scenarios: 01-pwn-request  02-script-injection  03-secret-exfil
+│              04-tag-hijack   05-cache-poisoning   (06+ planned)
+│
+├── docs/threat-model.md         ← system under test, trust boundaries, scenario catalog
+├── tests/fixtures/              ← known-vulnerable workflow used by the action self-test
 ├── .github/                     ← CI, issue forms, PR template, CODEOWNERS, Dependabot
 ├── CONTRIBUTING.md  SECURITY.md  CODE_OF_CONDUCT.md  CHANGELOG.md  CITATION.cff  LICENSE
-└── vulnerable/
-    └── README.md                ← target repo index
+└── vulnerable/README.md         ← target repo index (turla-lab-targets org)
 ```
+
+Vulnerable workflows live in separate repos under the `turla-lab-targets`
+org (see `vulnerable/README.md`), never in this repo.
 
 ## Quick start
 
@@ -263,9 +245,10 @@ Each scenario has its own documentation at four levels of detail:
 
 ## Roadmap
 
-- [x] Scenarios 01–04 with the full attack → detect → harden → verify loop
+- [x] Scenarios 01–05 with the full attack → detect → harden → verify loop
 - [x] CI that runs every verification suite, `shellcheck`, and a self-scan on each push
-- [ ] Scenarios 05–07 — cache poisoning, artifact tampering, self-hosted runner persistence
+- [x] Reusable GitHub Action wrapper and `lab pin` auto-fix for unpinned actions
+- [ ] Scenarios 06–07 — artifact tampering, self-hosted runner persistence
 - [ ] Scenarios 08–10 — `GITHUB_ENV` injection, reusable workflow trust, `GITHUB_TOKEN` over-privilege
 - [ ] Unified scanner covering all scenarios with SARIF output
 - [ ] Scenarios 11–14 — `workflow_run` poisoning, OIDC misconfiguration, artifact credential leakage, dependency confusion

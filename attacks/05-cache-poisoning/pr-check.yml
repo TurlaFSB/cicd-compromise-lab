@@ -1,0 +1,54 @@
+# VULNERABLE — DO NOT USE IN PRODUCTION
+#
+# Scenario 05, part 1 of 2: the writer.
+#
+# This workflow runs on `pull_request`, so it executes for PRs opened from
+# forks by anyone on the internet. It restores and SAVES a build cache under
+# a key that the privileged release workflow (release.yml) also uses.
+#
+# Because GitHub Actions caches created on a branch are readable by the
+# repository's default branch and by child branches, a cache entry written
+# here — by attacker-controlled PR code — can later be restored by the
+# trusted release build. The attacker never needs merge access; they only
+# need their PR workflow to run once and win the race to populate the key.
+#
+# OWASP CICD-SEC-9 (Improper Artifact Integrity Validation)
+# MITRE ATT&CK T1195.002 (Compromise Software Supply Chain)
+
+name: PR check
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@39370e3970a6d050c480ffad4ff0ed4d3fdee5af # v4.1.0
+        with:
+          node-version: 20
+
+      # VULNERABLE: static cache key shared with the release workflow, and
+      # read-write (actions/cache saves on cache miss at job end). PR code
+      # from a fork decides what lands under this key.
+      - uses: actions/cache@5a3ec84eff668545956fd18022155c47e93e2684 # v4.2.3
+        with:
+          path: |
+            node_modules
+            dist
+          key: build-cache
+
+      - run: npm ci
+
+      # Attacker-controlled: any step the PR author adds runs here and can
+      # write poisoned content into node_modules/ or dist/ before the cache
+      # is saved at the end of the job.
+      - run: npm run build

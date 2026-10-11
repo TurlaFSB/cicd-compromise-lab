@@ -76,10 +76,14 @@ Each scenario below becomes its own folder under `attacks/`, `hardened/`, and `d
 **OWASP:** CICD-SEC-3 (Dependency Chain Abuse) · **ATT&CK:** T1195.001 (Compromise Software Dependencies and Development Tools)
 **Fix:** pin every third-party action to a full commit SHA, not a tag; use Dependabot/Renovate to track and review SHA bumps; `persist-credentials: false` on checkout; per-job least-privilege permissions; environment protection on deploy jobs. See `hardened/04-tag-hijack/`.
 
-### 05 — Cache poisoning
-**Technique:** a build cache (e.g. `actions/cache`) keyed loosely enough that an attacker-controlled branch can poison a cache entry later restored by a trusted workflow run.
-**OWASP:** CICD-SEC-9 (Improper Artifact Integrity Validation) · **ATT&CK:** T1195.002
-**Fix direction:** scope cache keys tightly (include lockfile hash and branch), never restore caches written by untrusted-trigger workflows into privileged ones.
+### 05 — Cache poisoning ✅
+
+**Status:** Complete — detection operational (5 vectors + cache-scoping simulation), hardened workflows verified (12/12 checks pass).
+
+**Technique:** a build cache (`actions/cache`) is writable by an untrusted trigger (fork `pull_request`) under a static, forgeable key, and restored by a privileged workflow (push/release) that then builds from the poisoned content. GitHub's cache scoping lets a fork PR's entry be restored by the default-branch build.
+**OWASP:** CICD-SEC-9 (Improper Artifact Integrity Validation) · **ATT&CK:** T1195.002 (Compromise Software Supply Chain)
+**Impact:** an external contributor injects tampered dependencies or build output into a published release artifact without merging any code.
+**Fix:** read-only `actions/cache/restore` on untrusted triggers, keys bound to `hashFiles()`, no `restore-keys`, cache downloads not output, and always rebuild from source in the release job. See `hardened/05-cache-poisoning/`.
 
 ### 06 — Artifact tampering
 **Technique:** an artifact produced by the build job is modified before the release job consumes and publishes it, since `actions/upload-artifact`/`download-artifact` carry no integrity guarantee by default.
