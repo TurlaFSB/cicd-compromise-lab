@@ -22,7 +22,7 @@ All notable changes to this project are documented here. The format follows [Kee
 - Attack driver now commits as the maintainer's current identity; author email in captured scenario 01 evidence redacted.
 
 ### Planned
-- Scenarios 04–07 (mutable action tag hijack, cache poisoning, artifact tampering, self-hosted runner persistence).
+- Scenarios 05–07 (cache poisoning, artifact tampering, self-hosted runner persistence).
 - Scenarios 08–10 (`GITHUB_ENV` injection, reusable workflow trust boundary, `GITHUB_TOKEN` over-privilege).
 - Scenarios 11–14 (`workflow_run` artifact poisoning, OIDC trust misconfiguration, credential leakage via artifacts, dependency confusion).
 - Unified scanner emitting SARIF, and an empirical scan of public repositories.
