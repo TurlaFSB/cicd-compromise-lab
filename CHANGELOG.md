@@ -13,6 +13,11 @@ All notable changes to this project are documented here. The format follows [Kee
 - GitHub issue forms, pull request template, `CODEOWNERS`, and Dependabot configuration for GitHub Actions.
 - CI workflow that runs every scenario's verification suite and `shellcheck` on each push and pull request.
 
+### Fixed
+- Action wrapper aborted on repositories with no findings because the runner starts composite shell steps with `errexit`; it now disables it explicitly.
+- `SC2015` findings from ShellCheck 0.9 (the version on GitHub's Ubuntu runners) in the `live` argument checks of three verify scripts, which had kept the ShellCheck job red.
+- `verify/01-pwn-request/verify.sh live` called an undefined `die` function on a usage error; it now prints usage and exits 2.
+
 ### Changed
 - Attack driver now commits as the maintainer's current identity; author email in captured scenario 01 evidence redacted.
 

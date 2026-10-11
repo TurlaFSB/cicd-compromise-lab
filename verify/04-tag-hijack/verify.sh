@@ -282,7 +282,10 @@ case "${1:-}" in
     verify_static
     ;;
   live)
-    [ -n "${2:-}" ] && [ -n "${3:-}" ] || { echo "usage: $0 live <owner/repo> <target-clone-path>" >&2; exit 2; }
+    if [ -z "${2:-}" ] || [ -z "${3:-}" ]; then
+      echo "usage: $0 live <owner/repo> <target-clone-path>" >&2
+      exit 2
+    fi
     verify_live "$2" "$3"
     ;;
   *)

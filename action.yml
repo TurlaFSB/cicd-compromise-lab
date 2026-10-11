@@ -39,7 +39,10 @@ runs:
         INPUT_FAIL: ${{ inputs.fail-on-findings }}
         LAB: ${{ github.action_path }}/lab
       run: |
+        # The runner starts this shell with -e. Findings are reported through
+        # exit codes we inspect ourselves, so turn errexit off explicitly.
         set -uo pipefail
+        set +e
 
         target="${GITHUB_WORKSPACE}/${INPUT_PATH}"
         args=("$target")
@@ -53,7 +56,7 @@ runs:
         sed -i 's/\x1b\[[0-9;]*m//g' "$report"
 
         # One workflow annotation per finding, so they show on the run page.
-        grep 'FINDING:' "$report" | sed 's/^FINDING: //' | while IFS= read -r msg; do
+        { grep 'FINDING:' "$report" || true; } | sed 's/^FINDING: //' | while IFS= read -r msg; do
           echo "::error title=CI/CD Compromise Lab::${msg}"
         done
 
