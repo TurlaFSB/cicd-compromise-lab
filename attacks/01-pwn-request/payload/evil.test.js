@@ -69,7 +69,16 @@ test('pwn-request-01: attacker code runs with workflow token + secret access', a
   );
 
   // --- Evidence 2: secret reachable from PR-controlled code ---
-  const secretHash = hash(process.env.DUMMY_CLOUD_KEY);
+  // IMPORTANT: sha256("") is also a 64-char hex string, so hash length
+  // alone does not prove the secret was set and non-empty. Check
+  // truthiness of the raw value as its own assertion first — this is
+  // what actually proves reachability — and only hash it afterward
+  // for a non-reversible fingerprint. The raw value itself is never
+  // printed or stored anywhere, even though it is a dummy value.
+  const rawSecret = process.env.DUMMY_CLOUD_KEY;
+  const secretWasPresent = typeof rawSecret === 'string' && rawSecret.length > 0;
+  const secretHash = hash(rawSecret);
+
   const evidence = {
     scenario: '01-pwn-request',
     run_id: process.env.GITHUB_RUN_ID,
@@ -79,7 +88,10 @@ test('pwn-request-01: attacker code runs with workflow token + secret access', a
       http_status: commentResult.status,
       proved_write_access: commentResult.status === 201,
     },
-    dummy_cloud_key_sha256: secretHash,
+    secret_reachability_test: {
+      dummy_cloud_key_was_present_and_nonempty: secretWasPresent,
+      dummy_cloud_key_sha256: secretHash,
+    },
     note: 'Raw secret value intentionally never printed or stored, even though it is a dummy value — this mirrors real-world handling.',
   };
 
@@ -97,5 +109,5 @@ test('pwn-request-01: attacker code runs with workflow token + secret access', a
   }
 
   assert.ok(commentResult.status === 201, 'expected PR comment to post with GITHUB_TOKEN');
-  assert.ok(secretHash.length === 64, 'expected DUMMY_CLOUD_KEY to be readable');
+  assert.ok(secretWasPresent, 'expected DUMMY_CLOUD_KEY to be present and non-empty — if this fails, the secret may not be set on the target repo');
 });

@@ -55,10 +55,13 @@ PR_NUMBER=$(echo "$PR_JSON" | python3 -c 'import json,sys; print(json.load(sys.s
 echo "PR #$PR_NUMBER: https://github.com/$TARGET_REPO/pull/$PR_NUMBER"
 
 echo "==> Waiting for pull_request_target run to appear"
+# NOTE: the "branch" filter on this endpoint matches the run's
+# head_branch (the PR's branch), not the PR's base branch — so we
+# filter on $BRANCH, not "main".
 RUN_ID=""
 for i in $(seq 1 12); do
   sleep 10
-  RUN_ID=$(gh api "repos/$TARGET_REPO/actions/runs?event=pull_request_target&branch=main" \
+  RUN_ID=$(gh api "repos/$TARGET_REPO/actions/runs?event=pull_request_target&branch=$BRANCH" \
     --jq '.workflow_runs[0].id' 2>/dev/null || true)
   if [ -n "$RUN_ID" ] && [ "$RUN_ID" != "null" ]; then
     break
@@ -90,9 +93,22 @@ gh api "repos/$TARGET_REPO/issues/$PR_NUMBER/comments" > "$EVIDENCE_DIR/pr-comme
 ARTIFACT_ID=$(gh api "repos/$TARGET_REPO/actions/runs/$RUN_ID/artifacts" \
   --jq ".artifacts[] | select(.name==\"evidence-$RUN_ID\") | .id" || true)
 if [ -n "$ARTIFACT_ID" ]; then
-  gh api "repos/$TARGET_REPO/actions/artifacts/$ARTIFACT_ID/zip" > "$EVIDENCE_DIR/evidence.zip"
-  unzip -o "$EVIDENCE_DIR/evidence.zip" -d "$EVIDENCE_DIR" > /dev/null
-  echo "==> evidence.json extracted to $EVIDENCE_DIR/evidence.json"
+  # The artifact download redirects to Azure Blob Storage, which some
+  # sandboxed environments block at the network/proxy level. If this
+  # fails, the run-metadata.json + pr-comments.json already collected
+  # above are sufficient evidence on their own: job conclusion "success"
+  # means the payload's assertions (PR comment posted, secret hashed)
+  # passed. Download evidence.zip manually from the Actions run page
+  # as a fallback.
+  if gh api "repos/$TARGET_REPO/actions/artifacts/$ARTIFACT_ID/zip" > "$EVIDENCE_DIR/evidence.zip" 2>"$EVIDENCE_DIR/.artifact-download.err"; then
+    unzip -o "$EVIDENCE_DIR/evidence.zip" -d "$EVIDENCE_DIR" > /dev/null
+    echo "==> evidence.json extracted to $EVIDENCE_DIR/evidence.json"
+  else
+    echo "==> Artifact download blocked (likely network policy in this environment)."
+    echo "    run-metadata.json + pr-comments.json still prove the attack; download"
+    echo "    evidence.zip manually from: https://github.com/$TARGET_REPO/actions/runs/$RUN_ID"
+    rm -f "$EVIDENCE_DIR/evidence.zip"
+  fi
 else
   echo "No evidence artifact found — check run-metadata.json / the Actions log."
 fi
