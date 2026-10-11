@@ -1,0 +1,121 @@
+name: CI (HARDENED — scenario 04 fix)
+
+# FIX: The vulnerable workflow referenced every third-party action by a
+# mutable tag (@v1, @v4, etc.). A mutable tag is a Git ref that the
+# upstream maintainer (or anyone who compromises their account) can
+# force-push to point at an arbitrary commit at any time. The next run of
+# the consuming workflow then silently executes that new code with all
+# permissions and secrets the step has access to.
+#
+# Real-world precedent: the tj-actions/changed-files compromise (March
+# 2025) exploited exactly this pattern across 23,000+ repositories.
+#
+# This hardened version applies three layers of defense:
+#
+#   1. SHA PINNING — every `uses:` line pins to a full 40-character commit
+#      SHA (immutable) instead of a mutable tag. The human-readable tag
+#      is noted in a trailing comment for auditability.
+#
+#   2. DEPENDABOT — the repo's .github/dependabot.yml is configured to
+#      watch the `github-actions` ecosystem and open PRs when pinned
+#      SHAs fall behind. This keeps SHA pins current without manual toil.
+#
+#   3. LEAST-PRIVILEGE PERMISSIONS — each job declares only the
+#      permissions it needs. Secrets are scoped to the step that uses
+#      them, not broadcast in a workflow-level env: block.
+#
+# Standards:
+#   OWASP CICD-SEC-3 — Dependency Chain Abuse (eliminated)
+#   SLSA Build L2    — hermetic, pinned dependencies
+#   MITRE ATT&CK T1195.001 — Compromise Software Dependencies (mitigated)
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+# No workflow-level permissions — each job declares its own.
+# No workflow-level env: — secrets are scoped per-step.
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@39370e3970a6d050c480ffad4ff0ed4d3fdee5af # v4.1.0
+        with:
+          node-version: 20
+      - run: npm ci
+      - run: npm run lint
+
+  test:
+    runs-on: ubuntu-latest
+    needs: lint
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@39370e3970a6d050c480ffad4ff0ed4d3fdee5af # v4.1.0
+        with:
+          node-version: 20
+      - run: npm ci
+      - run: npm test
+
+  build:
+    runs-on: ubuntu-latest
+    needs: test
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@39370e3970a6d050c480ffad4ff0ed4d3fdee5af # v4.1.0
+        with:
+          node-version: 20
+      - run: npm ci && npm run build
+
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: build-output
+          path: dist/
+
+  deploy:
+    runs-on: ubuntu-latest
+    needs: build
+    if: github.ref == 'refs/heads/main'
+    permissions:
+      contents: read
+    environment:
+      name: production
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: build-output
+          path: dist/
+
+      # Lab helper action — pinned by SHA.
+      # In production, use `dependabot.yml` with `ecosystem: github-actions`
+      # to receive automated PRs when upstream publishes a new version.
+      - name: Deploy to staging
+        uses: turla-lab-targets/lab-helper-action@a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0 # v1.0.0 (lab fixture)
+        with:
+          target: staging
+          token: ${{ secrets.DEPLOY_TOKEN }}
+
+      - name: Notify on Slack
+        uses: slackapi/slack-github-action@485a9d42d3a73031f12ec201c457e2162c45d02d # v2.0.0
+        with:
+          webhook: ${{ secrets.SLACK_WEBHOOK }}
+          text: "Deployed ${{ github.sha }} to staging"

@@ -1,0 +1,94 @@
+# VULNERABLE — DO NOT USE IN PRODUCTION
+#
+# This workflow demonstrates the "mutable action tag hijack" pattern.
+# Every `uses:` line references an action by mutable tag (@v1, @v4, etc.)
+# instead of a pinned commit SHA.
+#
+# If ANY upstream action's tag is force-pushed to point at a new commit
+# (malicious maintainer, compromised account, or supply-chain attack),
+# the next run of this workflow silently executes the attacker's code
+# with full access to GITHUB_TOKEN and any secrets in scope.
+#
+# Real-world example: the tj-actions/changed-files compromise (March 2025)
+# weaponized this exact pattern across 23,000+ repositories.
+
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: write
+  packages: write
+
+env:
+  DEPLOY_TOKEN: ${{ secrets.DEPLOY_TOKEN }}
+  NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      # VULNERABLE: mutable tag — @v4 can be retagged at any time
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: npm ci
+      - run: npm run lint
+
+  test:
+    runs-on: ubuntu-latest
+    needs: lint
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: npm ci
+      - run: npm test
+
+  build:
+    runs-on: ubuntu-latest
+    needs: test
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: npm ci && npm run build
+
+      # VULNERABLE: third-party action by mutable tag
+      - uses: actions/upload-artifact@v4
+        with:
+          name: build-output
+          path: dist/
+
+  deploy:
+    runs-on: ubuntu-latest
+    needs: build
+    if: github.ref == 'refs/heads/main'
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: build-output
+          path: dist/
+
+      # VULNERABLE: third-party action pinned by mutable tag
+      - name: Deploy to staging
+        uses: turla-lab-targets/lab-helper-action@v1
+        with:
+          target: staging
+          token: ${{ secrets.DEPLOY_TOKEN }}
+
+      # VULNERABLE: another third-party action by mutable tag
+      - name: Notify on Slack
+        uses: slackapi/slack-github-action@v2
+        with:
+          webhook: ${{ secrets.SLACK_WEBHOOK }}
+          text: "Deployed ${{ github.sha }} to staging"

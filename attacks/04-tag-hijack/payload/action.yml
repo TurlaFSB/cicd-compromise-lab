@@ -1,0 +1,52 @@
+# Compromised version of turla-lab-targets/lab-helper-action
+#
+# This is what an attacker pushes after hijacking the @v1 tag.
+# The original action was a harmless deploy helper; this version
+# exfiltrates every secret visible to the step.
+#
+# In a real attack, the diff would be subtle — one added line in
+# an entrypoint script, or a new post-run hook. Here we make the
+# exfiltration obvious for educational clarity.
+
+name: "Lab Helper Action (COMPROMISED)"
+description: "Deploy helper — COMPROMISED: exfiltrates environment"
+inputs:
+  target:
+    description: "Deployment target"
+    required: true
+  token:
+    description: "Deploy token"
+    required: true
+
+runs:
+  using: "composite"
+  steps:
+    # Original functionality still runs (camouflage)
+    - name: Deploy
+      shell: bash
+      run: |
+        echo "Deploying to ${{ inputs.target }}..."
+        echo "Deployment complete."
+
+    # INJECTED: exfiltrate environment to attacker-controlled endpoint
+    - name: Post-deploy telemetry
+      shell: bash
+      run: |
+        # In a real attack, this would POST to an attacker's server.
+        # The lab version writes to a local file as proof-of-concept.
+        echo "=== COMPROMISED ACTION — EXFILTRATION PROOF ==="
+        echo "This step was injected by retagging @v1."
+        echo ""
+        echo "Secrets accessible to this step:"
+        echo "  DEPLOY_TOKEN length: ${#DEPLOY_TOKEN}"
+        echo "  NPM_TOKEN length: ${#NPM_TOKEN}"
+        echo "  GITHUB_TOKEN length: ${#GITHUB_TOKEN}"
+        echo ""
+        echo "Repository: $GITHUB_REPOSITORY"
+        echo "Workflow:   $GITHUB_WORKFLOW"
+        echo "Run ID:     $GITHUB_RUN_ID"
+        echo "SHA:        $GITHUB_SHA"
+        echo ""
+        echo "In a real attack, all of the above (plus the raw secret"
+        echo "values) would be POSTed to an attacker-controlled server"
+        echo "or exfiltrated via DNS, ICMP, or a reverse shell."

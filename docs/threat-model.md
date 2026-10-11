@@ -68,10 +68,13 @@ Each scenario below becomes its own folder under `attacks/`, `hardened/`, and `d
 **Impact:** secrets exfiltrated from build logs, compromised dependencies, or debug output remain valid indefinitely.
 **Fix:** per-job least-privilege permissions, step-scoped secrets, environment-gated deployments with required reviewers, no secrets in log output, SHA-pinned actions, OIDC federation guidance. See `hardened/03-secret-exfil/`.
 
-### 04 — Mutable action tag hijack
-**Technique:** a workflow references a third-party action by a mutable tag (`uses: org/action@v1`); if that tag is retagged upstream (compromise or malicious maintainer), the workflow silently runs new code next run.
+### 04 — Mutable action tag hijack ✅
+
+**Status:** Complete — detection operational (5 vectors), hardened workflow verified (12/12 checks pass).
+
+**Technique:** a workflow references a third-party action by a mutable tag (`uses: org/action@v1`); if that tag is retagged upstream (compromise or malicious maintainer), the workflow silently runs new code next run. Five mutable reference types detected: version tags, branch refs, special tags, short SHAs, and missing refs.
 **OWASP:** CICD-SEC-3 (Dependency Chain Abuse) · **ATT&CK:** T1195.001 (Compromise Software Dependencies and Development Tools)
-**Fix direction:** pin every third-party action to a full commit SHA, not a tag; use Dependabot/Renovate to track and review SHA bumps; run `zizmor`/`actionlint` as a CI gate.
+**Fix:** pin every third-party action to a full commit SHA, not a tag; use Dependabot/Renovate to track and review SHA bumps; `persist-credentials: false` on checkout; per-job least-privilege permissions; environment protection on deploy jobs. See `hardened/04-tag-hijack/`.
 
 ### 05 — Cache poisoning
 **Technique:** a build cache (e.g. `actions/cache`) keyed loosely enough that an attacker-controlled branch can poison a cache entry later restored by a trusted workflow run.

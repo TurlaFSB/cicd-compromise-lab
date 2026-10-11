@@ -26,7 +26,7 @@ CI/CD pipelines hold secrets, publish artifacts, and deploy to production — ma
 | 01 | [Pwn request](#scenario-01--pwn-request) | CICD-SEC-4 | T1195 | Complete |
 | 02 | [Script injection via issue title](#scenario-02--script-injection) | CICD-SEC-4, CICD-SEC-1 | T1059.004 | Complete |
 | 03 | [Secret exfiltration](#scenario-03--secret-exfiltration) | CICD-SEC-6, CICD-SEC-5 | T1552 | Complete |
-| 04 | [Mutable action tag hijack](#scenario-04--mutable-action-tag-hijack) | CICD-SEC-3 | T1195.001 | Planned |
+| 04 | [Mutable action tag hijack](#scenario-04--mutable-action-tag-hijack) | CICD-SEC-3 | T1195.001 | Complete |
 | 05 | [Cache poisoning](#scenario-05--cache-poisoning) | CICD-SEC-9 | T1195.002 | Planned |
 | 06 | [Artifact tampering](#scenario-06--artifact-tampering) | CICD-SEC-9 | T1195 | Planned |
 | 07 | Self-hosted runner persistence | CICD-SEC-7 | T1053, T1547 | Planned |
@@ -64,9 +64,11 @@ A workflow leaks secrets through six vectors: printing secrets in logs, base64-t
 
 ### Scenario 04 — Mutable action tag hijack
 
-A workflow references a third-party action by mutable tag (`uses: org/action@v1`). If that tag is force-pushed upstream, the workflow silently runs new code on the next trigger.
+A workflow references third-party actions by mutable tags (`uses: org/action@v1`). If any tag is force-pushed upstream — by a malicious maintainer, a compromised account, or a supply-chain attacker — the next workflow run silently executes the new code with full access to `GITHUB_TOKEN` and all secrets in scope. The scanner detects five mutable reference types: version tags, branch refs, special tags, short SHAs, and missing refs.
 
-**Fix:** Pin every third-party action to a full commit SHA. Use Dependabot or Renovate to track SHA bumps. Run `zizmor`/`actionlint` as a CI gate.
+**Fix:** Pin every third-party action to a full 40-character commit SHA. Use Dependabot to receive automated PRs when upstream publishes new versions. Set `persist-credentials: false` on checkout steps. Apply per-job least-privilege permissions and environment protection on deploy jobs.
+
+**Verification:** 12/12 structural checks pass. Detection scanner correctly flags all 11 mutable references in the vulnerable workflow and clears the hardened one.
 
 ### Scenario 05 — Cache poisoning
 
@@ -89,31 +91,44 @@ cicd-compromise-lab/                    turla-lab-targets/ (separate org)
 │   │   ├── attack.sh                   │
 │   │   ├── payload/                    ├── script-injection-target/
 │   │   └── evidence/                   │   └── .github/workflows/triage.yml
-│   └── 02-script-injection/            │
-│       ├── README.md                   └── secret-exfil-target/
-│       └── payload/                        └── .github/workflows/deploy.yml
+│   ├── 02-script-injection/            │
+│   │   ├── README.md                   ├── secret-exfil-target/
+│   │   └── payload/                    │   └── .github/workflows/deploy.yml
+│   └── 04-tag-hijack/                  │
+│       ├── vulnerable-ci.yml           └── tag-hijack-target/
+│       └── payload/                        └── .github/workflows/ci.yml
 ├── detections/
 │   ├── 01-pwn-request/
 │   │   ├── pwn-request.yml      ← Sigma rule
 │   │   ├── detect.sh            ← static + runtime scanner
 │   │   └── README.md
-│   └── 02-script-injection/
-│       ├── script-injection.yml ← Sigma rule
+│   ├── 02-script-injection/
+│   │   ├── script-injection.yml ← Sigma rule
+│   │   ├── detect.sh            ← static + runtime scanner
+│   │   └── README.md
+│   └── 04-tag-hijack/
+│       ├── tag-hijack.yml       ← Sigma rule (5 vectors)
 │       ├── detect.sh            ← static + runtime scanner
 │       └── README.md
 ├── hardened/
 │   ├── 01-pwn-request/
 │   │   ├── ci.yml               ← hardened workflow
 │   │   └── README.md
-│   └── 02-script-injection/
-│       ├── triage.yml           ← hardened workflow
+│   ├── 02-script-injection/
+│   │   ├── triage.yml           ← hardened workflow
+│   │   └── README.md
+│   └── 04-tag-hijack/
+│       ├── ci.yml               ← hardened workflow (all SHAs pinned)
 │       └── README.md
 ├── verify/
 │   ├── 01-pwn-request/
 │   │   ├── verify.sh            ← 10 structural checks
 │   │   └── README.md
-│   └── 02-script-injection/
-│       ├── verify.sh            ← 11 structural checks
+│   ├── 02-script-injection/
+│   │   ├── verify.sh            ← 11 structural checks
+│   │   └── README.md
+│   └── 04-tag-hijack/
+│       ├── verify.sh            ← 12 structural checks
 │       └── README.md
 ├── docs/
 │   └── threat-model.md
@@ -199,9 +214,9 @@ Each scenario has its own documentation at four levels of detail:
 
 ## Roadmap
 
-- [x] Scenarios 01–03 with the full attack → detect → harden → verify loop
+- [x] Scenarios 01–04 with the full attack → detect → harden → verify loop
 - [x] CI that runs every verification suite, `shellcheck`, and a self-scan on each push
-- [ ] Scenarios 04–07 — action tag hijack, cache poisoning, artifact tampering, self-hosted runner persistence
+- [ ] Scenarios 05–07 — cache poisoning, artifact tampering, self-hosted runner persistence
 - [ ] Scenarios 08–10 — `GITHUB_ENV` injection, reusable workflow trust, `GITHUB_TOKEN` over-privilege
 - [ ] Unified scanner covering all scenarios with SARIF output
 - [ ] Scenarios 11–14 — `workflow_run` poisoning, OIDC misconfiguration, artifact credential leakage, dependency confusion

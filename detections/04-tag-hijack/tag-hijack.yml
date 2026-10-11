@@ -1,0 +1,67 @@
+title: GitHub Actions Mutable Action Tag Reference
+id: a3c7e2f1-9d4b-4a8e-b6c5-1f0d2e3a4b5c
+status: experimental
+description: |
+  Detects GitHub Actions workflows that reference third-party actions using
+  mutable tags (@v1, @v2, @main, @latest, etc.) instead of pinned commit
+  SHAs. A mutable tag can be force-pushed upstream by a malicious or
+  compromised maintainer, causing every consuming workflow to silently
+  execute new, unreviewed code on the next run.
+
+  Real-world precedent: the tj-actions/changed-files compromise (March 2025)
+  exploited this pattern across 23,000+ repositories by retagging a widely
+  used action to inject secret-exfiltration code.
+
+  This rule fires on the workflow definition (YAML content), not on runtime
+  log events — it is a static-analysis / policy-check rule.
+references:
+  - https://owasp.org/www-project-top-10-ci-cd-security-risks/CICD-SEC-03-Dependency-Chain-Abuse
+  - https://docs.github.com/en/actions/security-for-github-actions/security-guides/security-hardening-for-github-actions#using-third-party-actions
+  - https://blog.stepsecurity.io/how-to-pin-github-actions-to-sha
+author: TurlaFSB
+date: 2026-10-11
+tags:
+  - attack.t1195.001
+  - attack.supply_chain
+  - cicd_sec_3
+logsource:
+  category: ci_cd
+  product: github_actions
+  service: workflow_definition
+detection:
+  # Matches `uses:` lines where the ref after @ is NOT a 40-char hex SHA
+  mutable_version_tag:
+    # uses: org/action@v1, @v2.3, @v4.1.0
+    uses|re: 'uses:\s+[^@\s]+@v\d'
+
+  mutable_branch_ref:
+    # uses: org/action@main, @master, @develop
+    uses|re: 'uses:\s+[^@\s]+@(main|master|develop|dev|trunk)\b'
+
+  mutable_special_tag:
+    # uses: org/action@latest, @stable, @release, @nightly
+    uses|re: 'uses:\s+[^@\s]+@(latest|stable|release|nightly)\b'
+
+  no_ref:
+    # uses: org/action (no @ at all — implicitly tracks default branch)
+    uses|re: 'uses:\s+[a-zA-Z][a-zA-Z0-9_.-]+/[a-zA-Z0-9_.-]+\s*$'
+
+  short_sha:
+    # uses: org/action@abc1234 (hex but < 40 chars)
+    uses|re: 'uses:\s+[^@\s]+@[0-9a-f]{4,39}(?![0-9a-f])'
+
+  filter_local_action:
+    uses|re: 'uses:\s+\./'
+  filter_docker:
+    uses|re: 'uses:\s+docker://'
+  filter_comment:
+    uses|re: '^\s*#'
+
+  condition: (mutable_version_tag or mutable_branch_ref or mutable_special_tag or no_ref or short_sha) and not (filter_local_action or filter_docker or filter_comment)
+
+falsepositives:
+  - First-party actions (actions/*, github/*) are technically mutable but
+    are maintained by GitHub. Some organizations accept the risk for
+    official actions. Use --skip-official in the scanner to suppress these.
+  - Workflows in archived or template repos not intended for production use.
+level: high
