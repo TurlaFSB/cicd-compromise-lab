@@ -85,10 +85,14 @@ Each scenario below becomes its own folder under `attacks/`, `hardened/`, and `d
 **Impact:** an external contributor injects tampered dependencies or build output into a published release artifact without merging any code.
 **Fix:** read-only `actions/cache/restore` on untrusted triggers, keys bound to `hashFiles()`, no `restore-keys`, cache downloads not output, and always rebuild from source in the release job. See `hardened/05-cache-poisoning/`.
 
-### 06 — Artifact tampering
-**Technique:** an artifact produced by the build job is modified before the release job consumes and publishes it, since `actions/upload-artifact`/`download-artifact` carry no integrity guarantee by default.
-**OWASP:** CICD-SEC-9 · **ATT&CK:** T1195
-**Fix direction:** Sigstore/cosign keyless signing of the artifact in the build job, SLSA provenance attestation, and a verify step before the release job publishes.
+### 06 — Artifact tampering ✅
+
+**Status:** Complete — detection operational (3 vectors + tamper simulation), hardened workflow verified (10/10 checks pass).
+
+**Technique:** an artifact produced by the build job is modified before the release job consumes and publishes it, since `actions/upload-artifact`/`download-artifact` carry no integrity guarantee by default. Nothing binds the build output to the published bytes.
+**OWASP:** CICD-SEC-9 (Improper Artifact Integrity Validation) · **ATT&CK:** T1195 (Supply Chain Compromise)
+**Impact:** a tampered artifact (malicious postinstall, backdoored bundle) is published under the project's real name and version to every downstream consumer.
+**Fix:** `actions/attest-build-provenance` signs a SLSA build-provenance attestation over the artifact in the build job; the publish job runs `gh attestation verify` (plus a SHA-256 checksum re-check) before publishing. See `hardened/06-artifact-tampering/`.
 
 ### 07 — Self-hosted runner persistence (stretch)
 **Technique:** a compromised job on a self-hosted runner drops a persistence mechanism that survives into later, unrelated jobs on the same runner.

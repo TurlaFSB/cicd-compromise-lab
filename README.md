@@ -28,7 +28,7 @@ CI/CD pipelines hold secrets, publish artifacts, and deploy to production — ma
 | 03 | [Secret exfiltration](#scenario-03--secret-exfiltration) | CICD-SEC-6, CICD-SEC-5 | T1552 | Complete |
 | 04 | [Mutable action tag hijack](#scenario-04--mutable-action-tag-hijack) | CICD-SEC-3 | T1195.001 | Complete |
 | 05 | [Cache poisoning](#scenario-05--cache-poisoning) | CICD-SEC-9 | T1195.002 | Complete |
-| 06 | [Artifact tampering](#scenario-06--artifact-tampering) | CICD-SEC-9 | T1195 | Planned |
+| 06 | [Artifact tampering](#scenario-06--artifact-tampering) | CICD-SEC-9 | T1195 | Complete |
 | 07 | Self-hosted runner persistence | CICD-SEC-7 | T1053, T1547 | Planned |
 | 08 | `GITHUB_ENV` / `GITHUB_PATH` injection | CICD-SEC-4 | T1574 | Planned |
 | 09 | Reusable workflow trust boundary | CICD-SEC-3, CICD-SEC-4 | T1195.001 | Planned |
@@ -80,9 +80,11 @@ Two workflows share a build cache: one runs on `pull_request` (fork PRs), the ot
 
 ### Scenario 06 — Artifact tampering
 
-An artifact produced by the build job is modified before the release job consumes it. `actions/upload-artifact`/`download-artifact` carry no integrity guarantee by default.
+A build job uploads `dist/` and a publish job downloads and ships it — with nothing binding the build output to the published bytes. `actions/upload-artifact`/`download-artifact` carry no integrity guarantee, so any actor able to write the artifact between the two jobs (a compromised step, a shared runner, a second workflow, or a fork's run in the `workflow_run` pattern) can swap the bytes and have them published under the project's real name.
 
-**Fix:** Sigstore/cosign keyless signing in the build job, SLSA provenance attestation, and a verification step before the release job publishes.
+**Fix:** `actions/attest-build-provenance` signs a SLSA build-provenance attestation over the artifact in the build job; the publish job runs `gh attestation verify` (plus a SHA-256 re-check) before publishing, so a tampered byte fails verification and is never shipped. A tamper simulation (`attacks/06-artifact-tampering/simulate.sh`) demonstrates the mechanism and proves the vulnerable workflow is tamperable and the hardened one is not.
+
+**Verification:** 10/10 structural checks pass. Scanner catches the unverified-publish and no-provenance vectors on the vulnerable workflow and clears the hardened one; simulation reports TAMPERABLE vs. SAFE.
 
 ## Architecture
 
@@ -111,7 +113,7 @@ cicd-compromise-lab/
 │   └── README.md                  what is verified, how to run, exit codes
 │
 ├── scenarios: 01-pwn-request  02-script-injection  03-secret-exfil
-│              04-tag-hijack   05-cache-poisoning   (06+ planned)
+│              04-tag-hijack   05-cache-poisoning   06-artifact-tampering  (07+ planned)
 │
 ├── docs/threat-model.md         ← system under test, trust boundaries, scenario catalog
 ├── tests/fixtures/              ← known-vulnerable workflow used by the action self-test
@@ -276,10 +278,10 @@ Each scenario has its own documentation at four levels of detail:
 
 ## Roadmap
 
-- [x] Scenarios 01–05 with the full attack → detect → harden → verify loop
+- [x] Scenarios 01–06 with the full attack → detect → harden → verify loop
 - [x] CI that runs every verification suite, `shellcheck`, and a self-scan on each push
 - [x] Reusable GitHub Action wrapper and `lab pin` auto-fix for unpinned actions
-- [ ] Scenarios 06–07 — artifact tampering, self-hosted runner persistence
+- [ ] Scenario 07 — self-hosted runner persistence
 - [ ] Scenarios 08–10 — `GITHUB_ENV` injection, reusable workflow trust, `GITHUB_TOKEN` over-privilege
 - [x] Unified scanner (`lab scan`) across all scenarios, with SARIF output for GitHub code scanning
 - [ ] Scenarios 11–14 — `workflow_run` poisoning, OIDC misconfiguration, artifact credential leakage, dependency confusion

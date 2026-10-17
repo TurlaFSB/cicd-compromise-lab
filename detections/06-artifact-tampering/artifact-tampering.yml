@@ -1,0 +1,71 @@
+title: GitHub Actions Artifact Tampering via Missing Integrity Validation
+id: c9a3e7b2-6d4f-4b18-8e52-2a7c1f0b9d3e
+status: experimental
+description: |
+  Detects GitHub Actions workflows that move a build artifact to a publish or
+  deploy step with no integrity binding: the artifact is uploaded without a
+  signature, SLSA provenance attestation, or checksum, and/or it is downloaded
+  and published without any verification. actions/upload-artifact and
+  download-artifact carry no integrity guarantee, so any actor able to write
+  the stored artifact between producer and consumer — a compromised step, a
+  malicious self-hosted runner, a second workflow with artifact write access,
+  or a fork's producing run in the workflow_run pattern — can swap the bytes
+  and have the publish step ship a tampered package.
+
+  This rule fires on the workflow definition (YAML), not on runtime log
+  events — it is a static-analysis / policy-check rule.
+references:
+  - https://owasp.org/www-project-top-10-ci-cd-security-risks/CICD-SEC-09-Improper-Artifact-Integrity-Validation
+  - https://docs.github.com/en/actions/security-for-github-actions/using-artifact-attestations/using-artifact-attestations-to-establish-provenance-for-builds
+  - https://slsa.dev/spec/v1.0/provenance
+author: TurlaFSB
+date: 2026-10-17
+tags:
+  - attack.t1195
+  - attack.supply_chain
+  - cicd_sec_9
+logsource:
+  category: ci_cd
+  product: github_actions
+  service: workflow_definition
+detection:
+  downloads_artifact:
+    uses|re: 'uses:\s*actions/download-artifact@'
+  downloads_artifact_cli:
+    run|re: 'gh\s+run\s+download'
+  uploads_artifact:
+    uses|re: 'uses:\s*actions/upload-artifact@'
+
+  publishes:
+    run|re: '(npm|yarn|pnpm)\s+publish|gh\s+release\s+(create|upload)|twine\s+upload|docker\s+push'
+  publishes_action:
+    uses|re: 'uses:\s*(softprops/action-gh-release|pypa/gh-action-pypi-publish)@'
+
+  has_provenance:
+    uses|re: 'uses:\s*actions/attest(-build-provenance)?@'
+  has_sign_or_sum:
+    run|re: 'cosign\s+sign|sha256sum[^|]*>'
+
+  verifies:
+    run|re: 'gh\s+attestation\s+verify|cosign\s+verify|sha256sum\s+(-c|--check)'
+  verifies_action:
+    uses|re: 'uses:\s*slsa-framework/slsa-verifier'
+
+  trigger_workflow_run:
+    on|re: '\bworkflow_run\b'
+
+  condition: >
+    (
+      ((downloads_artifact or downloads_artifact_cli) and (publishes or publishes_action)
+        and not (verifies or verifies_action))
+      or (uploads_artifact and not (has_provenance or has_sign_or_sum))
+      or (trigger_workflow_run and (downloads_artifact or downloads_artifact_cli))
+    )
+
+falsepositives:
+  - Artifacts consumed only within a build for testing and never published.
+  - Workflows that verify provenance through a mechanism not matched here
+    (e.g. an in-house verifier script); confirm the verification is real.
+  - A workflow_run consumer that downloads artifacts only from trusted,
+    same-repo producer workflows and verifies their provenance.
+level: high

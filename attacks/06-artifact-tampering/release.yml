@@ -1,0 +1,70 @@
+# VULNERABLE — DO NOT USE IN PRODUCTION
+#
+# Scenario 06 — artifact tampering (no integrity between build and publish).
+#
+# The build job compiles the project and uploads dist/ as a workflow
+# artifact. The publish job downloads that artifact and ships it (npm
+# publish). Nothing cryptographically binds "what the build produced" to
+# "what the publish job shipped":
+#
+#   - actions/upload-artifact / download-artifact carry NO integrity
+#     guarantee. The stored bytes are trusted blindly.
+#   - There is no signature, no SLSA provenance attestation, and no
+#     checksum generated at build time or verified at publish time.
+#
+# Any actor who can write the artifact between the two jobs — a compromised
+# intermediate step, a malicious self-hosted runner, a second workflow with
+# artifact write access, or (in the workflow_run variant) a fork's producing
+# run — can swap the bytes, and the publish job will ship the tampered
+# package to every downstream consumer.
+#
+# OWASP CICD-SEC-9 (Improper Artifact Integrity Validation)
+# MITRE ATT&CK T1195 (Supply Chain Compromise)
+
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@39370e3970a6d050c480ffad4ff0ed4d3fdee5af # v4.1.0
+        with:
+          node-version: 20
+      - run: npm ci && npm run build
+
+      # VULNERABLE: artifact uploaded with no signature, no attestation,
+      # and no checksum. There is nothing a consumer could verify.
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: dist
+          path: dist/
+
+  publish:
+    runs-on: ubuntu-latest
+    needs: build
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: dist
+          path: dist/
+
+      # VULNERABLE: publishes the downloaded bytes directly. No verification
+      # that dist/ is what the build job actually produced.
+      - run: npm publish
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
