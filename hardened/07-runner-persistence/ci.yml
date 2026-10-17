@@ -1,0 +1,38 @@
+name: CI (HARDENED — scenario 07 fix)
+
+# FIX: the vulnerable ci.yml ran untrusted pull_request code on a persistent
+# self-hosted runner, so an implant dropped by a fork PR survived into later
+# jobs. This version runs untrusted code on GitHub-hosted runners, which are
+# fresh, single-use VMs torn down after every job — there is nothing to
+# persist into.
+#
+# If a self-hosted runner is genuinely required (special hardware, private
+# network), the safe configuration is an EPHEMERAL runner (registered with
+# --ephemeral, one job per registration, auto-deregistered afterwards) in an
+# isolated pool that never runs trusted jobs. That is a runner-side setting,
+# not a workflow setting, so it is documented in the README; the workflow
+# itself must at minimum keep untrusted triggers off persistent runners.
+#
+# OWASP CICD-SEC-7 — Insecure System Configuration (eliminated)
+# MITRE ATT&CK T1053 / T1547 — persistence (mitigated)
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    # Fix: ephemeral GitHub-hosted runner — a fresh VM discarded after the job.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@39370e3970a6d050c480ffad4ff0ed4d3fdee5af # v4.1.0
+        with:
+          node-version: 20
+      - run: npm ci
+      - run: npm test

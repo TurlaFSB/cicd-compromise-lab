@@ -1,0 +1,42 @@
+# VULNERABLE — DO NOT USE IN PRODUCTION
+#
+# Scenario 07 — self-hosted runner persistence.
+#
+# This workflow runs untrusted pull_request code on a SELF-HOSTED runner.
+# Self-hosted runners are not torn down between jobs by default, so anything
+# a job leaves behind — a background process, a cron entry, a modified shell
+# profile, a tampered tool on PATH — survives and runs in LATER jobs on the
+# same machine, including trusted jobs for other repositories.
+#
+# A fork PR author controls the code this job runs. They can drop a
+# persistence mechanism that waits for a privileged job and then steals its
+# secrets or tampers its build.
+#
+# OWASP CICD-SEC-7 (Insecure System Configuration)
+# MITRE ATT&CK T1053 (Scheduled Task/Job), T1547 (Boot or Logon Autostart)
+
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    # VULNERABLE: untrusted PR code on a persistent self-hosted runner.
+    runs-on: [self-hosted, linux, x64]
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@39370e3970a6d050c480ffad4ff0ed4d3fdee5af # v4.1.0
+        with:
+          node-version: 20
+      - run: npm ci
+      # The PR controls these scripts. On a reused runner, anything written
+      # outside the workspace (crontab, ~/.bashrc, systemd --user, /tmp)
+      # persists into subsequent jobs.
+      - run: npm test

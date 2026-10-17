@@ -94,10 +94,14 @@ Each scenario below becomes its own folder under `attacks/`, `hardened/`, and `d
 **Impact:** a tampered artifact (malicious postinstall, backdoored bundle) is published under the project's real name and version to every downstream consumer.
 **Fix:** `actions/attest-build-provenance` signs a SLSA build-provenance attestation over the artifact in the build job; the publish job runs `gh attestation verify` (plus a SHA-256 checksum re-check) before publishing. See `hardened/06-artifact-tampering/`.
 
-### 07 — Self-hosted runner persistence (stretch)
-**Technique:** a compromised job on a self-hosted runner drops a persistence mechanism that survives into later, unrelated jobs on the same runner.
+### 07 — Self-hosted runner persistence ✅
+
+**Status:** Complete — detection operational (3 vectors + persistence simulation), hardened workflow verified (9/9 checks pass).
+
+**Technique:** a workflow runs untrusted `pull_request` code on a self-hosted runner; because such runners are reused between jobs, a fork PR drops a persistence mechanism (cron, shell profile, user systemd, background listener) that survives into later, privileged jobs on the same machine.
 **OWASP:** CICD-SEC-7 (Insecure System Configuration) · **ATT&CK:** T1053 (Scheduled Task/Job), T1547 (Boot or Logon Autostart Execution)
-**Fix direction:** ephemeral, single-job runners only; never reuse a self-hosted runner across untrusted and trusted workloads.
+**Impact:** an implant waits for a privileged job and steals its secrets or tampers its build — no merge required.
+**Fix:** run untrusted code on ephemeral GitHub-hosted runners (or single-use `--ephemeral` self-hosted runners in an isolated pool); never share a runner between untrusted and trusted workloads. See `hardened/07-runner-persistence/`.
 
 ## Detection strategy
 

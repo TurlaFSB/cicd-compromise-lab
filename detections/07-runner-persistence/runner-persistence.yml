@@ -1,0 +1,41 @@
+title: GitHub Actions Untrusted Code on Self-Hosted Runner (Persistence Risk)
+id: d1e4a8c3-7f2b-4c69-9a1d-3b6e0c2f5a7b
+status: experimental
+description: |
+  Detects workflows that run untrusted code (pull_request / pull_request_target
+  triggers) on a self-hosted runner. Self-hosted runners are reused across jobs
+  by default, so a fork PR's job can drop a persistence implant — a cron entry,
+  a shell-profile hook, a user systemd unit, a background listener — that
+  survives into later, trusted jobs on the same machine and steals their
+  secrets or tampers their builds.
+
+  This rule fires on the workflow definition (YAML), not on runtime log events.
+references:
+  - https://owasp.org/www-project-top-10-ci-cd-security-risks/CICD-SEC-07-Insecure-System-Configuration
+  - https://docs.github.com/en/actions/hosting-your-own-runners/managing-self-hosted-runners/autoscaling-with-self-hosted-runners#using-ephemeral-runners-for-autoscaling
+  - https://docs.github.com/en/actions/security-for-github-actions/security-guides/security-hardening-for-github-actions#hardening-for-self-hosted-runners
+author: TurlaFSB
+date: 2026-10-17
+tags:
+  - attack.t1053
+  - attack.t1547
+  - attack.persistence
+  - cicd_sec_7
+logsource:
+  category: ci_cd
+  product: github_actions
+  service: workflow_definition
+detection:
+  trigger_untrusted:
+    on|re: '\b(pull_request|pull_request_target)\b'
+  runs_self_hosted:
+    runs-on|contains: 'self-hosted'
+  persistence_write:
+    run|re: '(crontab|/etc/cron|systemctl --user|systemd/user|\.bashrc|\.profile|\.bash_profile|/etc/profile\.d|autostart)'
+  condition: (trigger_untrusted and runs_self_hosted) or (runs_self_hosted and persistence_write)
+falsepositives:
+  - Self-hosted runners registered as ephemeral (--ephemeral, one job each) are
+    safe; ephemerality is a runner-side setting not visible in the workflow, so
+    confirm it out of band.
+  - Isolated self-hosted pools that never run untrusted triggers.
+level: high

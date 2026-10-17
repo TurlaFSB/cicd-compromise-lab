@@ -5,6 +5,7 @@ All notable changes to this project are documented here. The format follows [Kee
 ## [Unreleased]
 
 ### Added
+- **Scenario 07 — self-hosted runner persistence:** vulnerable workflow running untrusted PR code on a self-hosted runner, three-vector scanner, a persistence simulation (reused vs ephemeral runner), Sigma rule, hardened workflow on ephemeral GitHub-hosted runners, 9 verification checks.
 - **Scenario 06 — artifact tampering:** vulnerable build→publish workflow (no integrity binding), three-vector scanner, a concrete tamper simulation (hash → tamper → verify), Sigma rule, hardened workflow using `actions/attest-build-provenance` + `gh attestation verify`, 10 verification checks.
 - SARIF 2.1.0 output: `lab scan --format sarif` and a `sarif-file` input on the Action, so findings land on the exact workflow line in GitHub's Security tab with their rule and OWASP link. A dedicated converter (`detections/to_sarif.py`) maps each detector vector to a stable rule id; CI generates and validates a report for the fixture.
 - **Scenario 05 — cache poisoning:** vulnerable writer/victim workflow pair, five-vector job-aware scanner, offline cache-scoping simulation, Sigma rule, hardened read-only/content-bound workflows, 12 verification checks.
@@ -25,7 +26,6 @@ All notable changes to this project are documented here. The format follows [Kee
 - Attack driver now commits as the maintainer's current identity; author email in captured scenario 01 evidence redacted.
 
 ### Planned
-- Scenario 07 (self-hosted runner persistence).
 - Scenarios 08–10 (`GITHUB_ENV` injection, reusable workflow trust boundary, `GITHUB_TOKEN` over-privilege).
 - Scenarios 11–14 (`workflow_run` artifact poisoning, OIDC trust misconfiguration, credential leakage via artifacts, dependency confusion).
 - An empirical scan of public repositories, compared against `zizmor` and `actionlint`.

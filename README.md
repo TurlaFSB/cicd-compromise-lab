@@ -29,7 +29,7 @@ CI/CD pipelines hold secrets, publish artifacts, and deploy to production — ma
 | 04 | [Mutable action tag hijack](#scenario-04--mutable-action-tag-hijack) | CICD-SEC-3 | T1195.001 | Complete |
 | 05 | [Cache poisoning](#scenario-05--cache-poisoning) | CICD-SEC-9 | T1195.002 | Complete |
 | 06 | [Artifact tampering](#scenario-06--artifact-tampering) | CICD-SEC-9 | T1195 | Complete |
-| 07 | Self-hosted runner persistence | CICD-SEC-7 | T1053, T1547 | Planned |
+| 07 | Self-hosted runner persistence | CICD-SEC-7 | T1053, T1547 | Complete |
 | 08 | `GITHUB_ENV` / `GITHUB_PATH` injection | CICD-SEC-4 | T1574 | Planned |
 | 09 | Reusable workflow trust boundary | CICD-SEC-3, CICD-SEC-4 | T1195.001 | Planned |
 | 10 | `GITHUB_TOKEN` over-privilege | CICD-SEC-5, CICD-SEC-2 | T1078.004 | Planned |
@@ -113,7 +113,8 @@ cicd-compromise-lab/
 │   └── README.md                  what is verified, how to run, exit codes
 │
 ├── scenarios: 01-pwn-request  02-script-injection  03-secret-exfil
-│              04-tag-hijack   05-cache-poisoning   06-artifact-tampering  (07+ planned)
+│              04-tag-hijack   05-cache-poisoning   06-artifact-tampering
+│              07-runner-persistence   (08+ planned)
 │
 ├── docs/threat-model.md         ← system under test, trust boundaries, scenario catalog
 ├── tests/fixtures/              ← known-vulnerable workflow used by the action self-test
@@ -278,10 +279,9 @@ Each scenario has its own documentation at four levels of detail:
 
 ## Roadmap
 
-- [x] Scenarios 01–06 with the full attack → detect → harden → verify loop
+- [x] Scenarios 01–07 with the full attack → detect → harden → verify loop
 - [x] CI that runs every verification suite, `shellcheck`, and a self-scan on each push
 - [x] Reusable GitHub Action wrapper and `lab pin` auto-fix for unpinned actions
-- [ ] Scenario 07 — self-hosted runner persistence
 - [ ] Scenarios 08–10 — `GITHUB_ENV` injection, reusable workflow trust, `GITHUB_TOKEN` over-privilege
 - [x] Unified scanner (`lab scan`) across all scenarios, with SARIF output for GitHub code scanning
 - [ ] Scenarios 11–14 — `workflow_run` poisoning, OIDC misconfiguration, artifact credential leakage, dependency confusion
