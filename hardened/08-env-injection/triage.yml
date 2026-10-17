@@ -1,0 +1,62 @@
+name: Issue triage (HARDENED — scenario 08 fix)
+
+# FIX: the vulnerable triage.yml wrote the untrusted issue title into
+# $GITHUB_ENV and the untrusted body into $GITHUB_PATH, letting a crafted
+# value inject environment variables (NODE_OPTIONS, LD_PRELOAD) or PATH
+# entries that hijack later steps.
+#
+# This version never writes untrusted data to the runner environment files:
+#
+#   1. The untrusted title is exposed to the step that needs it through a
+#      step-scoped `env:` variable, which the runner sets literally — it is
+#      never parsed as GITHUB_ENV lines, so a newline cannot inject a second
+#      variable. Variable references are double-quoted.
+#   2. Nothing is written to $GITHUB_PATH; the body is never used to build a
+#      PATH entry.
+#   3. Where a value genuinely must cross steps, it is written under a FIXED
+#      name using a random heredoc delimiter so the untrusted value cannot
+#      close the block — shown here for a sanitized label only.
+#
+# OWASP CICD-SEC-4 — Poisoned Pipeline Execution (eliminated)
+# MITRE ATT&CK T1574 — Hijack Execution Flow (mitigated)
+
+on:
+  issues:
+    types: [opened]
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  triage:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+
+      - name: Process
+        env:
+          # Runner-set, not shell-expanded into a GITHUB_ENV line. A newline
+          # in the title is just data here; it cannot define a new variable.
+          ISSUE_TITLE: ${{ github.event.issue.title }}
+        run: |
+          echo "Triaging: $ISSUE_TITLE"
+          node ./scripts/triage.js || true
+
+      - name: Record a sanitized label for later steps
+        env:
+          ISSUE_TITLE: ${{ github.event.issue.title }}
+        run: |
+          # If a value must cross steps, derive a SANITIZED one (alphanumerics
+          # only) and write it under a fixed name with a random delimiter so
+          # the untrusted content can neither rename the variable nor close
+          # the heredoc.
+          safe=$(printf '%s' "$ISSUE_TITLE" | tr -cd '[:alnum:]-_ ' | cut -c1-80)
+          delim="EOF_$(openssl rand -hex 8 2>/dev/null || date +%s%N)"
+          {
+            echo "SAFE_LABEL<<$delim"
+            printf '%s\n' "$safe"
+            echo "$delim"
+          } >> "$GITHUB_ENV"

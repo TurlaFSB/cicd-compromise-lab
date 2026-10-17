@@ -1,0 +1,52 @@
+# VULNERABLE — DO NOT USE IN PRODUCTION
+#
+# Scenario 08 — GITHUB_ENV / GITHUB_PATH injection.
+#
+# This workflow writes untrusted issue text straight into the runner's
+# environment files:
+#
+#   $GITHUB_ENV  — every KEY=VALUE line here becomes an environment variable
+#                  in ALL later steps of the job.
+#   $GITHUB_PATH — every line here is prepended to PATH for later steps.
+#
+# An attacker who controls the issue title or body can therefore:
+#   - inject an extra variable (a crafted title containing a newline and
+#     NODE_OPTIONS=--require /tmp/evil.js) that hijacks the next `node` call;
+#   - prepend an attacker-controlled directory to PATH so a planted `npm` or
+#     `node` shim runs instead of the real tool.
+#
+# OWASP CICD-SEC-4 (Poisoned Pipeline Execution)
+# MITRE ATT&CK T1574 (Hijack Execution Flow)
+
+name: Issue triage
+
+on:
+  issues:
+    types: [opened]
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  triage:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+
+      - name: Record issue metadata
+        run: |
+          # VULNERABLE: untrusted title written directly into $GITHUB_ENV.
+          # A newline in the title injects additional KEY=VALUE lines.
+          echo "ISSUE_TITLE=${{ github.event.issue.title }}" >> "$GITHUB_ENV"
+          # VULNERABLE: untrusted body appended to $GITHUB_PATH, prepending
+          # whatever directory it names to PATH for later steps.
+          echo "${{ github.event.issue.body }}" >> "$GITHUB_PATH"
+
+      - name: Process
+        run: |
+          echo "Triaging: $ISSUE_TITLE"
+          # Any injected NODE_OPTIONS / PATH entry now influences this step.
+          node ./scripts/triage.js || true

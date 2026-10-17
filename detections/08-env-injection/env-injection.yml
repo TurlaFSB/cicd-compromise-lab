@@ -1,0 +1,42 @@
+title: GitHub Actions Environment File Injection (GITHUB_ENV / GITHUB_PATH)
+id: e2b5c9a7-8d3f-4a21-b7e6-4c1f0a2d6b8e
+status: experimental
+description: |
+  Detects workflows that write untrusted context, or execution-hijacking
+  variables, into the runner environment files. Every KEY=VALUE line in
+  $GITHUB_ENV becomes an environment variable, and every line in $GITHUB_PATH
+  is prepended to PATH, for all later steps in the job. Writing an
+  attacker-controlled value (an issue title, PR body, branch name) there lets
+  a crafted value inject an extra variable such as NODE_OPTIONS or LD_PRELOAD,
+  or a PATH entry that makes a planted shim run in place of a real tool.
+
+  This rule fires on the workflow definition (YAML), not on runtime log events.
+references:
+  - https://owasp.org/www-project-top-10-ci-cd-security-risks/CICD-SEC-04-Poisoned-Pipeline-Execution
+  - https://docs.github.com/en/actions/writing-workflows/choosing-what-your-workflow-does/workflow-commands-for-github-actions#setting-an-environment-variable
+  - https://securitylab.github.com/research/github-actions-untrusted-input/
+author: TurlaFSB
+date: 2026-10-17
+tags:
+  - attack.t1574
+  - attack.execution
+  - cicd_sec_4
+logsource:
+  category: ci_cd
+  product: github_actions
+  service: workflow_definition
+detection:
+  writes_env_file:
+    run|re: '>>\s*"?\$\{?GITHUB_(ENV|PATH)\}?'
+  untrusted_context:
+    run|re: '\$\{\{[^}]*(github\.event\.(issue|pull_request|comment|review|discussion|head_commit)|github\.head_ref)'
+  dangerous_var:
+    run|re: '(NODE_OPTIONS|LD_PRELOAD|LD_LIBRARY_PATH|BASH_ENV|PYTHONPATH|PERL5LIB|DYLD_INSERT_LIBRARIES)='
+  condition: writes_env_file and (untrusted_context or dangerous_var)
+falsepositives:
+  - Writing trusted, static values to GITHUB_ENV (e.g. a computed version
+    string from a lockfile) is normal; the rule requires untrusted context or
+    a known execution-hijacking variable on the write.
+  - Values written under a fixed name with a random heredoc delimiter after
+    sanitization are safe; review the surrounding step.
+level: high

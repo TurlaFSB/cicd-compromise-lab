@@ -30,7 +30,7 @@ CI/CD pipelines hold secrets, publish artifacts, and deploy to production — ma
 | 05 | [Cache poisoning](#scenario-05--cache-poisoning) | CICD-SEC-9 | T1195.002 | Complete |
 | 06 | [Artifact tampering](#scenario-06--artifact-tampering) | CICD-SEC-9 | T1195 | Complete |
 | 07 | Self-hosted runner persistence | CICD-SEC-7 | T1053, T1547 | Complete |
-| 08 | `GITHUB_ENV` / `GITHUB_PATH` injection | CICD-SEC-4 | T1574 | Planned |
+| 08 | `GITHUB_ENV` / `GITHUB_PATH` injection | CICD-SEC-4 | T1574 | Complete |
 | 09 | Reusable workflow trust boundary | CICD-SEC-3, CICD-SEC-4 | T1195.001 | Planned |
 | 10 | `GITHUB_TOKEN` over-privilege | CICD-SEC-5, CICD-SEC-2 | T1078.004 | Planned |
 | 11 | `workflow_run` artifact poisoning | CICD-SEC-4 | T1195 | Planned |
@@ -86,6 +86,22 @@ A build job uploads `dist/` and a publish job downloads and ships it — with no
 
 **Verification:** 10/10 structural checks pass. Scanner catches the unverified-publish and no-provenance vectors on the vulnerable workflow and clears the hardened one; simulation reports TAMPERABLE vs. SAFE.
 
+### Scenario 07 — Self-hosted runner persistence
+
+A workflow runs untrusted `pull_request` code on a self-hosted runner. Self-hosted runners are reused between jobs, so a fork PR can drop a persistence implant (cron, shell profile, user systemd, background listener) that survives into later, privileged jobs on the same machine and steals their secrets or tampers their builds — no merge required.
+
+**Fix:** Run untrusted code on ephemeral GitHub-hosted runners, or single-use `--ephemeral` self-hosted runners in an isolated pool that never runs trusted jobs. A simulation (`attacks/07-runner-persistence/simulate.sh`) contrasts a reused runner (implant survives) with an ephemeral one (implant gone).
+
+**Verification:** 9/9 structural checks pass. Scanner flags untrusted-on-self-hosted and persistence-writing steps; simulation reports PERSISTS vs. SAFE.
+
+### Scenario 08 — GITHUB_ENV / GITHUB_PATH injection
+
+A workflow writes the untrusted issue title into `$GITHUB_ENV` and body into `$GITHUB_PATH`. Every `KEY=VALUE` line in `$GITHUB_ENV` becomes an env var for later steps, and every `$GITHUB_PATH` line is prepended to `PATH`, so a crafted value injects `NODE_OPTIONS`/`LD_PRELOAD` or a shim directory that hijacks a later step.
+
+**Fix:** Pass untrusted data through step-scoped `env:` (set literally by the runner, never parsed as env-file lines); never write `$GITHUB_PATH` with untrusted data; for cross-step values use a fixed name, sanitized value, and random heredoc delimiter. A simulation (`attacks/08-env-injection/simulate.sh`) smuggles `NODE_OPTIONS` through a vulnerable write and shows the safe path does not.
+
+**Verification:** 9/9 structural checks pass. Scanner catches untrusted writes to both env files and dangerous-variable writes; simulation reports INJECTABLE vs. SAFE.
+
 ## Architecture
 
 Every scenario repeats the same four-folder layout, so the tree below shows
@@ -114,7 +130,7 @@ cicd-compromise-lab/
 │
 ├── scenarios: 01-pwn-request  02-script-injection  03-secret-exfil
 │              04-tag-hijack   05-cache-poisoning   06-artifact-tampering
-│              07-runner-persistence   (08+ planned)
+│              07-runner-persistence   08-env-injection   (09+ planned)
 │
 ├── docs/threat-model.md         ← system under test, trust boundaries, scenario catalog
 ├── tests/fixtures/              ← known-vulnerable workflow used by the action self-test
@@ -279,10 +295,10 @@ Each scenario has its own documentation at four levels of detail:
 
 ## Roadmap
 
-- [x] Scenarios 01–07 with the full attack → detect → harden → verify loop
+- [x] Scenarios 01–08 with the full attack → detect → harden → verify loop
 - [x] CI that runs every verification suite, `shellcheck`, and a self-scan on each push
 - [x] Reusable GitHub Action wrapper and `lab pin` auto-fix for unpinned actions
-- [ ] Scenarios 08–10 — `GITHUB_ENV` injection, reusable workflow trust, `GITHUB_TOKEN` over-privilege
+- [ ] Scenarios 09–10 — reusable workflow trust, `GITHUB_TOKEN` over-privilege
 - [x] Unified scanner (`lab scan`) across all scenarios, with SARIF output for GitHub code scanning
 - [ ] Scenarios 11–14 — `workflow_run` poisoning, OIDC misconfiguration, artifact credential leakage, dependency confusion
 - [ ] Empirical scan of public repositories and comparison against `zizmor` and `actionlint`

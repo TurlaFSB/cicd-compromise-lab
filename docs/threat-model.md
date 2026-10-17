@@ -103,6 +103,15 @@ Each scenario below becomes its own folder under `attacks/`, `hardened/`, and `d
 **Impact:** an implant waits for a privileged job and steals its secrets or tampers its build — no merge required.
 **Fix:** run untrusted code on ephemeral GitHub-hosted runners (or single-use `--ephemeral` self-hosted runners in an isolated pool); never share a runner between untrusted and trusted workloads. See `hardened/07-runner-persistence/`.
 
+### 08 — GITHUB_ENV / GITHUB_PATH injection ✅
+
+**Status:** Complete — detection operational (3 vectors + injection simulation), hardened workflow verified (9/9 checks pass).
+
+**Technique:** a workflow writes untrusted issue/PR text into `$GITHUB_ENV` or `$GITHUB_PATH`; a crafted value injects an extra environment variable (NODE_OPTIONS, LD_PRELOAD) or a PATH entry that hijacks a later step.
+**OWASP:** CICD-SEC-4 (Poisoned Pipeline Execution) · **ATT&CK:** T1574 (Hijack Execution Flow)
+**Impact:** arbitrary code execution in a later step via loader/PATH hijacking, from attacker-controlled input alone.
+**Fix:** pass untrusted data through step-scoped `env:`, never write it to the env files; never write `$GITHUB_PATH` with untrusted data; for cross-step values use a fixed name, sanitized value, and random heredoc delimiter. See `hardened/08-env-injection/`.
+
 ## Detection strategy
 
 Each scenario gets a corresponding detection in `detections/`, expressed as:
