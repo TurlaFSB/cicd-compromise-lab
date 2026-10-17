@@ -5,6 +5,7 @@
 #   ./lab list                              list scenarios and their status
 #   ./lab scan <path> [--skip-official]     run every scenario scanner against a local repo
 #   ./lab scan --repo <owner/repo>          run every scanner against a remote repo (needs gh)
+#   ./lab scan <path> --format sarif [-o F] emit SARIF 2.1.0 (for GitHub code scanning)
 #   ./lab pin <path> [--write]              resolve action tags/branches to commit SHAs (diff only unless --write)
 #   ./lab verify [scenario-id|all]          prove the hardened workflows resist the attacks
 #   ./lab doctor                            check that required tools are installed
@@ -30,7 +31,7 @@ NC='\033[0m'
 die() { echo -e "${RED}ERROR:${NC} $*" >&2; exit 2; }
 
 usage() {
-  sed -n '2,16p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'
+  sed -n '2,19p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'
 }
 
 # Print scenario directory names (e.g. 01-pwn-request), sorted.
@@ -86,16 +87,19 @@ cmd_doctor() {
 }
 
 cmd_scan() {
-  local target="" remote="" extra=()
+  local target="" remote="" format="text" output="" extra=()
   while [ $# -gt 0 ]; do
     case "$1" in
       --repo) remote="${2:-}"; [ -n "$remote" ] || die "--repo needs owner/repo"; shift 2 ;;
       --skip-official) extra+=("$1"); shift ;;
+      --format) format="${2:-}"; [ -n "$format" ] || die "--format needs a value (text|sarif)"; shift 2 ;;
+      --output|-o) output="${2:-}"; [ -n "$output" ] || die "--output needs a file path"; shift 2 ;;
       -*) die "unknown option: $1" ;;
       *) target="$1"; shift ;;
     esac
   done
-  [ -n "$target" ] || [ -n "$remote" ] || die "usage: ./lab scan <path> | --repo <owner/repo>"
+  [ -n "$target" ] || [ -n "$remote" ] || die "usage: ./lab scan <path> | --repo <owner/repo> [--format text|sarif] [--output FILE]"
+  case "$format" in text|sarif) ;; *) die "unknown --format '$format' (want text|sarif)" ;; esac
 
   local mode="static" subject="$target"
   if [ -n "$remote" ]; then
@@ -103,6 +107,11 @@ cmd_scan() {
     mode="runtime"; subject="$remote"
   else
     [ -d "$target" ] || die "not a directory: $target"
+  fi
+
+  if [ "$format" = "sarif" ]; then
+    cmd_scan_sarif "$mode" "$subject" "$output" ${extra[@]+"${extra[@]}"}
+    return
   fi
 
   local id out rc flagged=0 total=0 failed=0
@@ -132,6 +141,49 @@ cmd_scan() {
 
   if [ "$failed" -gt 0 ]; then exit 2; fi
   if [ "$flagged" -gt 0 ]; then exit 1; fi
+}
+
+# Emit SARIF 2.1.0 for GitHub code scanning. Collects each detector's findings,
+# tags every line with its scenario id, and pipes them to the converter.
+cmd_scan_sarif() {
+  local mode="$1" subject="$2" output="$3"; shift 3
+  local -a extra=("$@")
+  command -v python3 >/dev/null 2>&1 || die "sarif output needs python3"
+
+  local tool_version
+  tool_version=$(cat "$LAB_ROOT/VERSION" 2>/dev/null || echo "0.0.0")
+
+  local id rc any_error=0 esc tab
+  esc=$(printf '\033')   # strip the detectors' ANSI colour codes
+  tab=$(printf '\t')     # real tab separator the converter splits on
+  local raw out
+  raw=$(mktemp)
+  while IFS= read -r id; do
+    local -a flags=()
+    if [ "$id" = "04-tag-hijack" ] && [ "${#extra[@]}" -gt 0 ]; then flags=("${extra[@]}"); fi
+    rc=0
+    out=$("$LAB_ROOT/detections/$id/detect.sh" "$mode" "$subject" ${flags[@]+"${flags[@]}"} 2>/dev/null) || rc=$?
+    printf '%s\n' "$out" \
+      | sed "s/${esc}\[[0-9;]*m//g" \
+      | sed "s/^/${id}${tab}/" >>"$raw"
+    # rc 1 = findings (expected), rc 0 = clean; anything else is a real error.
+    if [ "$rc" -gt 1 ]; then any_error=1; fi
+  done < <(scenario_ids)
+
+  local sarif
+  sarif=$(python3 "$LAB_ROOT/detections/to_sarif.py" --tool-version "$tool_version" <"$raw")
+  rm -f "$raw"
+
+  if [ -n "$output" ]; then
+    printf '%s\n' "$sarif" >"$output"
+    local n
+    n=$(grep -c '"ruleId"' <<<"$sarif" || true)
+    echo "Wrote SARIF with $n result(s) to $output" >&2
+  else
+    printf '%s\n' "$sarif"
+  fi
+
+  [ "$any_error" -eq 0 ] || exit 2
 }
 
 cmd_verify() {

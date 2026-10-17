@@ -19,11 +19,18 @@ inputs:
     description: Fail the step when any scanner reports a finding.
     required: false
     default: "true"
+  sarif-file:
+    description: Path to write a SARIF 2.1.0 report to. Empty disables SARIF output.
+    required: false
+    default: ""
 
 outputs:
   findings:
     description: Number of scanners that reported findings.
     value: ${{ steps.scan.outputs.findings }}
+  sarif-file:
+    description: Path of the SARIF report written (empty if SARIF was not requested).
+    value: ${{ steps.scan.outputs.sarif-file }}
 
 runs:
   using: composite
@@ -37,6 +44,7 @@ runs:
         INPUT_PATH: ${{ inputs.path }}
         INPUT_SKIP_OFFICIAL: ${{ inputs.skip-official }}
         INPUT_FAIL: ${{ inputs.fail-on-findings }}
+        INPUT_SARIF: ${{ inputs.sarif-file }}
         LAB: ${{ github.action_path }}/lab
       run: |
         # The runner starts this shell with -e. Findings are reported through
@@ -51,6 +59,19 @@ runs:
         report="$(mktemp)"
         rc=0
         "$LAB" scan "${args[@]}" >"$report" 2>&1 || rc=$?
+
+        # Optional SARIF for GitHub code scanning. Generated independently so a
+        # non-zero scan (findings) still produces a valid report to upload.
+        sarif_out=""
+        if [ -n "${INPUT_SARIF}" ]; then
+          sarif_path="${GITHUB_WORKSPACE}/${INPUT_SARIF}"
+          if "$LAB" scan "${args[@]}" --format sarif -o "$sarif_path" 2>>"$report"; then
+            sarif_out="${INPUT_SARIF}"
+          else
+            echo "::warning::SARIF generation failed; continuing without it." >>"$report"
+          fi
+        fi
+        echo "sarif-file=${sarif_out}" >> "$GITHUB_OUTPUT"
 
         # Strip terminal colour codes for logs and the job summary.
         sed -i 's/\x1b\[[0-9;]*m//g' "$report"

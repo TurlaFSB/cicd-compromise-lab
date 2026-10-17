@@ -32,6 +32,9 @@ jobs:
           shopt -s nullglob
           shellcheck lab detections/*/detect.sh verify/*/verify.sh
 
+      - name: Byte-compile Python helpers
+        run: python3 -m py_compile detections/to_sarif.py
+
   verify:
     name: Verify scenarios
     runs-on: ubuntu-latest
@@ -83,3 +86,35 @@ jobs:
             echo "::error::wrapper failed to flag the vulnerable fixture"
             exit 1
           fi
+
+      - name: Action emits SARIF for the vulnerable fixture
+        id: sarif
+        uses: ./
+        with:
+          path: tests/fixtures/vulnerable
+          fail-on-findings: "false"
+          sarif-file: fixture.sarif
+
+      # Validate the SARIF is well-formed and non-empty. We deliberately do NOT
+      # upload it to the Security tab: these are intentional lab fixtures, not
+      # real issues in this repository.
+      - name: Validate generated SARIF
+        env:
+          SARIF_FILE: ${{ steps.sarif.outputs.sarif-file }}
+        run: |
+          test -n "$SARIF_FILE" || { echo "::error::no SARIF file produced"; exit 1; }
+          python3 - "$SARIF_FILE" <<'PY'
+          import json, sys
+          d = json.load(open(sys.argv[1]))
+          assert d["version"] == "2.1.0", d.get("version")
+          run = d["runs"][0]
+          rules = {r["id"] for r in run["tool"]["driver"]["rules"]}
+          results = run["results"]
+          assert results, "expected at least one result for the fixture"
+          orphans = [r["ruleId"] for r in results if r["ruleId"] not in rules]
+          assert not orphans, f"results reference undeclared rules: {orphans}"
+          for r in results:
+              loc = r["locations"][0]["physicalLocation"]["artifactLocation"]["uri"]
+              assert loc.startswith(".github/workflows/"), loc
+          print(f"SARIF valid: {len(rules)} rules, {len(results)} results")
+          PY

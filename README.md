@@ -94,13 +94,16 @@ one scenario in full and lists the rest. `<id>` is the scenario slug, e.g.
 cicd-compromise-lab/
 ├── lab                          ← single CLI entry point (list/scan/pin/verify/doctor)
 ├── action.yml                   ← reusable GitHub Action wrapper (scan on every PR)
+├── VERSION                      ← tool version stamped into SARIF output
 │
 ├── attacks/<id>/                ← the vulnerable workflow(s), attack driver, payload, evidence
 │   └── README.md                  vulnerability write-up, attack path, MITRE/OWASP mapping
-├── detections/<id>/
-│   ├── <name>.yml               ← Sigma rule
-│   ├── detect.sh                ← static + runtime scanner
-│   └── README.md                  scanner usage, false positives, limitations
+├── detections/
+│   ├── to_sarif.py              ← findings → SARIF 2.1.0 converter (GitHub code scanning)
+│   └── <id>/
+│       ├── <name>.yml           ← Sigma rule
+│       ├── detect.sh            ← static + runtime scanner
+│       └── README.md              scanner usage, false positives, limitations
 ├── hardened/<id>/               ← the fixed workflow(s)
 │   └── README.md                  before/after, defense layers, standards mapping
 ├── verify/<id>/
@@ -129,8 +132,10 @@ The `lab` script is the single entry point for everything below:
 ./lab list                      # scenarios and what each one ships
 ./lab scan /path/to/your/repo   # run every scenario scanner against a local repo
 ./lab scan --repo owner/repo    # same, against a remote repo (needs gh)
+./lab scan /path --format sarif # emit SARIF 2.1.0 for GitHub code scanning
 ./lab verify                    # prove every hardened workflow resists its attack
 ./lab verify 04                 # ...or just one scenario
+./lab pin /path/to/your/repo    # resolve action tags to commit SHAs (diff first)
 ```
 
 `./lab scan` exits `1` when any scanner reports a finding, so it drops straight into CI as a gate. Scenario scanners are discovered automatically, so new scenarios appear in `list`, `scan` and `verify` with no extra wiring.
@@ -159,6 +164,32 @@ jobs:
 ```
 
 Findings appear as annotations on the run and in the job summary. The step output `findings` holds the number of scanners that reported something.
+
+**See findings in the Security tab** by asking the action for a SARIF report and handing it to GitHub's code-scanning upload. SARIF is the standard interchange format that puts each finding on the exact workflow line, with its rule and OWASP link:
+
+```yaml
+name: Workflow security scan
+on: [pull_request]
+permissions:
+  contents: read
+  security-events: write   # required to upload SARIF
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@<full-commit-sha> # vX.Y.Z
+        with:
+          persist-credentials: false
+      - uses: TurlaFSB/cicd-compromise-lab@<full-commit-sha>
+        with:
+          sarif-file: cicd-lab.sarif
+          fail-on-findings: "false"   # let the upload run; the Security tab is the gate
+      - uses: github/codeql-action/upload-sarif@<full-commit-sha> # vX
+        with:
+          sarif_file: cicd-lab.sarif
+```
+
+You can also generate SARIF locally: `./lab scan /path/to/repo --format sarif -o out.sarif`.
 
 **Fix unpinned actions** with `lab pin`, which resolves every tag or branch reference to its full commit SHA and keeps the tag as a comment:
 
@@ -250,7 +281,7 @@ Each scenario has its own documentation at four levels of detail:
 - [x] Reusable GitHub Action wrapper and `lab pin` auto-fix for unpinned actions
 - [ ] Scenarios 06–07 — artifact tampering, self-hosted runner persistence
 - [ ] Scenarios 08–10 — `GITHUB_ENV` injection, reusable workflow trust, `GITHUB_TOKEN` over-privilege
-- [ ] Unified scanner covering all scenarios with SARIF output
+- [x] Unified scanner (`lab scan`) across all scenarios, with SARIF output for GitHub code scanning
 - [ ] Scenarios 11–14 — `workflow_run` poisoning, OIDC misconfiguration, artifact credential leakage, dependency confusion
 - [ ] Empirical scan of public repositories and comparison against `zizmor` and `actionlint`
 - [ ] Jenkins phase 2 (separate top-level folder or repo)
