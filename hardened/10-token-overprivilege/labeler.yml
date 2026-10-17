@@ -1,0 +1,20 @@
+name: Labeler (HARDENED — scenario 10 fix)
+
+# FIX: the vulnerable labeler had no `permissions:` block and so inherited the
+# repository default. This version states a deny-by-default floor with an empty
+# workflow-level block, then grants the single scope the job needs — and only to
+# that job.
+
+on:
+  pull_request:
+
+permissions: {}
+
+jobs:
+  label:
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write   # needed to apply labels; nothing else
+    steps:
+      - name: Label by path
+        run: echo "labelling pull request"

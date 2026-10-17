@@ -1,0 +1,32 @@
+name: Release (HARDENED — scenario 10 reference)
+
+# Reference pattern for the legitimate case: a release job really does need
+# write access. The grant is declared on the job (not the workflow), on a
+# trigger only maintainers can fire (a pushed tag), and is limited to the one
+# scope the job uses. Other jobs in this file stay read-only.
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+      - name: Build
+        run: make build
+
+  publish:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write   # create the GitHub release; scoped to this job only
+    steps:
+      - name: Create release
+        run: echo "creating release for ${GITHUB_REF_NAME}"

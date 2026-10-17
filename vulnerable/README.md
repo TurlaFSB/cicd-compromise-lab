@@ -15,6 +15,7 @@ Each scenario's intentionally vulnerable workflow lives in a separate public rep
 | 07 — Self-hosted runner persistence | `turla-lab-targets/runner-persistence-target` | `.github/workflows/ci.yml` | `pull_request` |
 | 08 — GITHUB_ENV / GITHUB_PATH injection | `turla-lab-targets/env-injection-target` | `.github/workflows/triage.yml` | `issues: opened` |
 | 09 — Reusable workflow trust boundary | `turla-lab-targets/reusable-workflow-target` | `.github/workflows/release.yml` | `push: tags` |
+| 10 — GITHUB_TOKEN over-privilege | `turla-lab-targets/token-overprivilege-target` | `.github/workflows/ci.yml` | `pull_request_target` |
 
 ## Safety rules
 

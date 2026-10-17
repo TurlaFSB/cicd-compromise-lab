@@ -32,7 +32,7 @@ CI/CD pipelines hold secrets, publish artifacts, and deploy to production — ma
 | 07 | Self-hosted runner persistence | CICD-SEC-7 | T1053, T1547 | Complete |
 | 08 | `GITHUB_ENV` / `GITHUB_PATH` injection | CICD-SEC-4 | T1574 | Complete |
 | 09 | Reusable workflow trust boundary | CICD-SEC-3, CICD-SEC-4 | T1195.001 | Complete |
-| 10 | `GITHUB_TOKEN` over-privilege | CICD-SEC-5, CICD-SEC-2 | T1078.004 | Planned |
+| 10 | `GITHUB_TOKEN` over-privilege | CICD-SEC-5, CICD-SEC-2 | T1078.004 | Complete |
 | 11 | `workflow_run` artifact poisoning | CICD-SEC-4 | T1195 | Planned |
 | 12 | OIDC trust policy misconfiguration | CICD-SEC-2, CICD-SEC-5 | T1078.004 | Planned |
 | 13 | Credential leakage via artifacts | CICD-SEC-6 | T1552.001 | Planned |
@@ -110,6 +110,14 @@ A caller invokes an external reusable workflow by a mutable ref (`@main`) and pa
 
 **Verification:** 7/7 structural checks pass. Scanner distinguishes job-level reusable-workflow calls from step-level actions and flags mutable refs and `secrets: inherit`.
 
+### Scenario 10 — GITHUB_TOKEN over-privilege
+
+Three workflows hold a `GITHUB_TOKEN` far broader than their work needs: `permissions: write-all` on a `pull_request_target` trigger, no `permissions:` block at all (the token takes the repository default, often read-write), and `contents`/`packages`/`id-token` write behind an `issue_comment` trigger anyone can fire. Over-privilege is the amplifier for every other scenario: it decides whether one compromised step is an annoyance or a takeover.
+
+**Fix:** a read-only floor at workflow level (`contents: read` or `{}`), write scopes declared per job beside the step that uses them, no high-risk write behind an untrusted trigger, `pull_request` instead of `pull_request_target` for CI, and a read-only repository default. A simulation (`attacks/10-token-overprivilege/simulate.sh`) resolves the effective token per job and prints what each write scope unlocks.
+
+**Verification:** 15/15 checks pass. Four-vector scanner (`write-all`, no block, workflow-level write, write on untrusted trigger) shares one permissions parser with the simulation.
+
 ## Architecture
 
 Every scenario repeats the same four-folder layout, so the tree below shows
@@ -139,7 +147,7 @@ cicd-compromise-lab/
 ├── scenarios: 01-pwn-request  02-script-injection  03-secret-exfil
 │              04-tag-hijack   05-cache-poisoning   06-artifact-tampering
 │              07-runner-persistence   08-env-injection   09-reusable-workflow
-│              (10+ planned)
+│              10-token-overprivilege   (11+ planned)
 │
 ├── docs/threat-model.md         ← system under test, trust boundaries, scenario catalog
 ├── tests/fixtures/              ← known-vulnerable workflow used by the action self-test
@@ -304,10 +312,9 @@ Each scenario has its own documentation at four levels of detail:
 
 ## Roadmap
 
-- [x] Scenarios 01–09 with the full attack → detect → harden → verify loop
+- [x] Scenarios 01–10 with the full attack → detect → harden → verify loop
 - [x] CI that runs every verification suite, `shellcheck`, and a self-scan on each push
 - [x] Reusable GitHub Action wrapper and `lab pin` auto-fix for unpinned actions
-- [ ] Scenario 10 — `GITHUB_TOKEN` over-privilege
 - [x] Unified scanner (`lab scan`) across all scenarios, with SARIF output for GitHub code scanning
 - [ ] Scenarios 11–14 — `workflow_run` poisoning, OIDC misconfiguration, artifact credential leakage, dependency confusion
 - [ ] Empirical scan of public repositories and comparison against `zizmor` and `actionlint`

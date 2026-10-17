@@ -1,0 +1,41 @@
+name: CI (HARDENED — scenario 10 fix)
+
+# FIX: the vulnerable CI workflow granted `write-all` on a trigger reachable
+# by fork PRs. This version:
+#
+#   1. Runs on `pull_request` (no privileged token, no secrets for forks)
+#      and on `push` to main, instead of `pull_request_target`.
+#   2. Sets `permissions: contents: read` at workflow level — the floor that
+#      every job inherits. Nothing here can push, publish, or mint tokens.
+#   3. Any job that genuinely needs more declares it itself, with the narrowest
+#      scope, so the grant is visible in review next to the step that uses it.
+#
+# OWASP CICD-SEC-5 — Insufficient Pipeline-Based Access Controls (mitigated)
+# MITRE ATT&CK T1078.004 — Valid Accounts: Cloud Accounts (mitigated)
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+      - name: Run tests
+        run: make test
+
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+      - name: Lint
+        run: make lint

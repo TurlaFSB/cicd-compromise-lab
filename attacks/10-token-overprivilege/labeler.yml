@@ -1,0 +1,16 @@
+name: Labeler (VULNERABLE — scenario 10)
+
+# VULNERABLE: no `permissions:` block anywhere. The token falls back to the
+# repository (or organisation) default, which on older repositories and many
+# organisations is read-write across contents, packages, actions and more.
+# The author never decided what this job may do, so nobody reviewed it.
+
+on:
+  pull_request:
+
+jobs:
+  label:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Label by path
+        run: echo "labelling pull request"

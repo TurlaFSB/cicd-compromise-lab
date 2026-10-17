@@ -5,6 +5,8 @@ All notable changes to this project are documented here. The format follows [Kee
 ## [Unreleased]
 
 ### Added
+- **Scenario 10 — `GITHUB_TOKEN` over-privilege:** three vulnerable workflows (`write-all` on `pull_request_target`, no permissions block, high-risk write on `issue_comment`), a four-vector scanner built on a shared awk permissions parser, an effective-token simulation that maps each write scope to what it unlocks, Sigma rule, hardened workflows with a read-only floor and per-job grants, 15 verification checks.
+- SARIF rule metadata (title and OWASP link) for scenarios 06–10 in `to_sarif.py`; previously they fell back to the default link.
 - **Scenario 09 — reusable workflow trust boundary:** vulnerable caller using a mutable `@main` ref with `secrets: inherit`, three-vector scanner that separates job-level `uses:` from step-level actions, Sigma rule, hardened caller pinned by SHA with explicitly named secrets, 7 verification checks.
 - **Scenario 08 — GITHUB_ENV / GITHUB_PATH injection:** vulnerable workflow writing untrusted issue text to the runner env files, three-vector scanner, an injection simulation (NODE_OPTIONS smuggled via GITHUB_ENV), Sigma rule, hardened workflow passing untrusted data via step-scoped `env:` with a safe heredoc cross-step pattern, 9 verification checks.
 - **Scenario 07 — self-hosted runner persistence:** vulnerable workflow running untrusted PR code on a self-hosted runner, three-vector scanner, a persistence simulation (reused vs ephemeral runner), Sigma rule, hardened workflow on ephemeral GitHub-hosted runners, 9 verification checks.
@@ -28,7 +30,6 @@ All notable changes to this project are documented here. The format follows [Kee
 - Attack driver now commits as the maintainer's current identity; author email in captured scenario 01 evidence redacted.
 
 ### Planned
-- Scenario 10 (`GITHUB_TOKEN` over-privilege).
 - Scenarios 11–14 (`workflow_run` artifact poisoning, OIDC trust misconfiguration, credential leakage via artifacts, dependency confusion).
 - An empirical scan of public repositories, compared against `zizmor` and `actionlint`.
 

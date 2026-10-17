@@ -121,6 +121,15 @@ Each scenario below becomes its own folder under `attacks/`, `hardened/`, and `d
 **Impact:** full secret exposure to, and silent code change from, an external party.
 **Fix:** pin the reusable workflow by commit SHA; pass only the needed secrets by name, never `secrets: inherit`. See `hardened/09-reusable-workflow/`.
 
+### 10 — GITHUB_TOKEN over-privilege ✅
+
+**Status:** Complete — detection operational (4 vectors + effective-token simulation), hardened workflows verified (15/15 checks pass).
+
+**Technique:** a workflow's `GITHUB_TOKEN` holds more authority than its jobs need — `permissions: write-all`, no `permissions:` block (repository default, often read-write), write scopes declared at workflow level, or high-risk write scopes reachable from triggers an outsider can fire.
+**OWASP:** CICD-SEC-5 (Insufficient PBAC), CICD-SEC-2 (Inadequate IAM) · **ATT&CK:** T1078.004 (Valid Accounts: Cloud Accounts)
+**Impact:** amplifies every other compromise — a single hijacked step can push code, publish packages, delete caches, or mint OIDC tokens.
+**Fix:** read-only workflow-level floor, write scopes per job, no high-risk write on untrusted triggers, read-only repository default. See `hardened/10-token-overprivilege/`.
+
 ## Detection strategy
 
 Each scenario gets a corresponding detection in `detections/`, expressed as:

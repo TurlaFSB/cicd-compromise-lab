@@ -1,0 +1,22 @@
+name: Triage bot (VULNERABLE — scenario 10)
+
+# VULNERABLE: runs on `issue_comment`, so any GitHub user can trigger it by
+# commenting, yet the job holds `contents: write`, `packages: write` and
+# `id-token: write`. A bot that only needs to add a label should never be able
+# to push code, publish a package, or request a cloud identity token.
+
+on:
+  issue_comment:
+    types: [created]
+
+jobs:
+  triage:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      packages: write
+      id-token: write
+      issues: write
+    steps:
+      - name: Acknowledge
+        run: echo "comment received"

@@ -54,6 +54,26 @@ SCENARIOS = {
         "Improper artifact integrity validation / cache poisoning",
         "https://owasp.org/www-project-top-10-ci-cd-security-risks/CICD-SEC-09-Improper-Artifact-Integrity-Validation",
     ),
+    "06-artifact-tampering": (
+        "Artifact integrity not bound to build provenance",
+        "https://owasp.org/www-project-top-10-ci-cd-security-risks/CICD-SEC-09-Improper-Artifact-Integrity-Validation",
+    ),
+    "07-runner-persistence": (
+        "Untrusted code on a reusable self-hosted runner",
+        "https://owasp.org/www-project-top-10-ci-cd-security-risks/CICD-SEC-07-Insecure-System-Configuration",
+    ),
+    "08-env-injection": (
+        "GITHUB_ENV / GITHUB_PATH injection",
+        "https://owasp.org/www-project-top-10-ci-cd-security-risks/CICD-SEC-04-Poisoned-Pipeline-Execution",
+    ),
+    "09-reusable-workflow": (
+        "Reusable workflow trust boundary",
+        "https://owasp.org/www-project-top-10-ci-cd-security-risks/CICD-SEC-03-Dependency-Chain-Abuse",
+    ),
+    "10-token-overprivilege": (
+        "GITHUB_TOKEN over-privilege",
+        "https://owasp.org/www-project-top-10-ci-cd-security-risks/CICD-SEC-05-Insufficient-PBAC",
+    ),
 }
 
 # Matches "<file>" or "<file>:<line>" then ": <message>".

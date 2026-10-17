@@ -1,0 +1,21 @@
+name: Triage bot (HARDENED — scenario 10 fix)
+
+# FIX: the vulnerable triage bot ran on `issue_comment` (anyone can trigger it)
+# while holding contents/packages/id-token write. A bot that only acknowledges
+# a comment needs `issues: write` and nothing more. Deny-by-default at workflow
+# level, one narrow grant at job level.
+
+on:
+  issue_comment:
+    types: [created]
+
+permissions: {}
+
+jobs:
+  triage:
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write   # post an acknowledgement comment; nothing else
+    steps:
+      - name: Acknowledge
+        run: echo "comment received"

@@ -1,0 +1,51 @@
+title: GitHub Actions GITHUB_TOKEN Over-Privilege (write-all / no permissions / write on untrusted trigger)
+id: 6b1e4d27-3f90-4a58-9c2e-d8a7f5b04c13
+status: experimental
+description: |
+  Detects workflow definitions whose GITHUB_TOKEN holds more authority than
+  the job needs: `permissions: write-all`, a workflow or job with no
+  `permissions:` block (the token falls back to the repository default, which
+  is read-write on older repositories and many organisations), write scopes
+  granted at workflow level so every job inherits them, and high-risk write
+  scopes (contents, actions, packages, id-token, deployments, pages,
+  security-events, attestations) reachable from a trigger an outsider can fire
+  (pull_request_target, issue_comment, issues, workflow_run).
+
+  A compromised step in such a job can push code, publish packages, delete
+  caches and artifacts, or mint OIDC tokens for cloud access.
+
+  This rule fires on the workflow definition (YAML), not on runtime logs.
+references:
+  - https://owasp.org/www-project-top-10-ci-cd-security-risks/CICD-SEC-05-Insufficient-PBAC
+  - https://docs.github.com/en/actions/security-for-github-actions/security-guides/automatic-token-authentication#modifying-the-permissions-for-the-github_token
+  - https://docs.github.com/en/actions/writing-workflows/workflow-syntax-for-github-actions#permissions
+author: TurlaFSB
+date: 2026-10-17
+tags:
+  - attack.t1078.004
+  - attack.privilege_escalation
+  - cicd_sec_5
+logsource:
+  category: ci_cd
+  product: github_actions
+  service: workflow_definition
+detection:
+  write_all:
+    permissions|re: '^\s*permissions:\s*write-all\s*$'
+  workflow_level_write:
+    # a write scope under a top-level (column-0) permissions block
+    permissions_block|re: '(?m)^permissions:\s*\n(\s+[a-z-]+:\s*\S+\s*\n)*?\s+[a-z-]+:\s*write\b'
+  untrusted_trigger_with_high_risk_write:
+    trigger|re: '(?m)^\s*(pull_request_target|issue_comment|issues|workflow_run|pull_request_review_comment)\b'
+    scope|re: '^\s+(contents|actions|packages|id-token|deployments|pages|security-events|attestations):\s*write\s*$'
+  condition: write_all or workflow_level_write or untrusted_trigger_with_high_risk_write
+falsepositives:
+  - >-
+    A release job that legitimately needs contents write on a maintainer-only
+    trigger (a pushed tag) and declares it on the job; the third selection only
+    fires together with an untrusted trigger.
+  - >-
+    A labeler or triage bot on pull_request_target that holds pull-requests or
+    issues write and never checks out PR code; those scopes are not treated as
+    high-risk.
+level: high
