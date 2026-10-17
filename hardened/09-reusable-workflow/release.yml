@@ -1,0 +1,29 @@
+name: Release (HARDENED — scenario 09 fix)
+
+# FIX: the vulnerable caller used an external reusable workflow by a mutable
+# ref and passed every secret with `secrets: inherit`. This version:
+#
+#   1. Pins the reusable workflow to a full commit SHA, so the upstream org
+#      cannot change what runs without the pin changing (same immutability
+#      as SHA-pinning an action — scenario 04). The version is noted in a
+#      comment for auditability, and Dependabot can bump it with review.
+#
+#   2. Passes ONLY the secret the reusable workflow actually needs, by name,
+#      instead of `secrets: inherit`. A compromise upstream can reach
+#      NPM_TOKEN and nothing else — not the caller's other credentials.
+#
+# OWASP CICD-SEC-3 — Dependency Chain Abuse (eliminated)
+# OWASP CICD-SEC-4 — Poisoned Pipeline Execution (mitigated)
+# MITRE ATT&CK T1195.001 — Compromise Software Dependencies (mitigated)
+
+on:
+  push:
+    tags: ["v*"]
+
+jobs:
+  release:
+    # Pinned to a full commit SHA; the tag is a comment only.
+    uses: acme-shared/pipelines/.github/workflows/release.yml@3a9f1c2e7b4d6a8f0c1e2d3b4a5f6e7d8c9b0a1f # v2.3.1
+    # Only the secret this workflow needs, passed explicitly by name.
+    secrets:
+      NPM_TOKEN: ${{ secrets.NPM_TOKEN }}

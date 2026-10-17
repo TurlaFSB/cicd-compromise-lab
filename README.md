@@ -31,7 +31,7 @@ CI/CD pipelines hold secrets, publish artifacts, and deploy to production — ma
 | 06 | [Artifact tampering](#scenario-06--artifact-tampering) | CICD-SEC-9 | T1195 | Complete |
 | 07 | Self-hosted runner persistence | CICD-SEC-7 | T1053, T1547 | Complete |
 | 08 | `GITHUB_ENV` / `GITHUB_PATH` injection | CICD-SEC-4 | T1574 | Complete |
-| 09 | Reusable workflow trust boundary | CICD-SEC-3, CICD-SEC-4 | T1195.001 | Planned |
+| 09 | Reusable workflow trust boundary | CICD-SEC-3, CICD-SEC-4 | T1195.001 | Complete |
 | 10 | `GITHUB_TOKEN` over-privilege | CICD-SEC-5, CICD-SEC-2 | T1078.004 | Planned |
 | 11 | `workflow_run` artifact poisoning | CICD-SEC-4 | T1195 | Planned |
 | 12 | OIDC trust policy misconfiguration | CICD-SEC-2, CICD-SEC-5 | T1078.004 | Planned |
@@ -102,6 +102,14 @@ A workflow writes the untrusted issue title into `$GITHUB_ENV` and body into `$G
 
 **Verification:** 9/9 structural checks pass. Scanner catches untrusted writes to both env files and dangerous-variable writes; simulation reports INJECTABLE vs. SAFE.
 
+### Scenario 09 — Reusable workflow trust boundary
+
+A caller invokes an external reusable workflow by a mutable ref (`@main`) and passes `secrets: inherit`. The upstream owner then controls code that runs with every secret the caller holds, and can change it at any time without the caller's consent.
+
+**Fix:** Pin the reusable workflow by full commit SHA with a version comment, and pass only the secrets it needs by name instead of `secrets: inherit`. Blast radius drops from every caller secret to one.
+
+**Verification:** 7/7 structural checks pass. Scanner distinguishes job-level reusable-workflow calls from step-level actions and flags mutable refs and `secrets: inherit`.
+
 ## Architecture
 
 Every scenario repeats the same four-folder layout, so the tree below shows
@@ -130,7 +138,8 @@ cicd-compromise-lab/
 │
 ├── scenarios: 01-pwn-request  02-script-injection  03-secret-exfil
 │              04-tag-hijack   05-cache-poisoning   06-artifact-tampering
-│              07-runner-persistence   08-env-injection   (09+ planned)
+│              07-runner-persistence   08-env-injection   09-reusable-workflow
+│              (10+ planned)
 │
 ├── docs/threat-model.md         ← system under test, trust boundaries, scenario catalog
 ├── tests/fixtures/              ← known-vulnerable workflow used by the action self-test
@@ -295,10 +304,10 @@ Each scenario has its own documentation at four levels of detail:
 
 ## Roadmap
 
-- [x] Scenarios 01–08 with the full attack → detect → harden → verify loop
+- [x] Scenarios 01–09 with the full attack → detect → harden → verify loop
 - [x] CI that runs every verification suite, `shellcheck`, and a self-scan on each push
 - [x] Reusable GitHub Action wrapper and `lab pin` auto-fix for unpinned actions
-- [ ] Scenarios 09–10 — reusable workflow trust, `GITHUB_TOKEN` over-privilege
+- [ ] Scenario 10 — `GITHUB_TOKEN` over-privilege
 - [x] Unified scanner (`lab scan`) across all scenarios, with SARIF output for GitHub code scanning
 - [ ] Scenarios 11–14 — `workflow_run` poisoning, OIDC misconfiguration, artifact credential leakage, dependency confusion
 - [ ] Empirical scan of public repositories and comparison against `zizmor` and `actionlint`

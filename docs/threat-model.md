@@ -112,6 +112,15 @@ Each scenario below becomes its own folder under `attacks/`, `hardened/`, and `d
 **Impact:** arbitrary code execution in a later step via loader/PATH hijacking, from attacker-controlled input alone.
 **Fix:** pass untrusted data through step-scoped `env:`, never write it to the env files; never write `$GITHUB_PATH` with untrusted data; for cross-step values use a fixed name, sanitized value, and random heredoc delimiter. See `hardened/08-env-injection/`.
 
+### 09 — Reusable workflow trust boundary ✅
+
+**Status:** Complete — detection operational (3 vectors), hardened caller verified (7/7 checks pass).
+
+**Technique:** a caller invokes an external reusable workflow by a mutable ref (`@main`) and passes `secrets: inherit`, so the upstream owner controls code that runs with every one of the caller's secrets and can change it at any time.
+**OWASP:** CICD-SEC-3 (Dependency Chain Abuse), CICD-SEC-4 (Poisoned Pipeline Execution) · **ATT&CK:** T1195.001 (Compromise Software Dependencies and Development Tools)
+**Impact:** full secret exposure to, and silent code change from, an external party.
+**Fix:** pin the reusable workflow by commit SHA; pass only the needed secrets by name, never `secrets: inherit`. See `hardened/09-reusable-workflow/`.
+
 ## Detection strategy
 
 Each scenario gets a corresponding detection in `detections/`, expressed as:

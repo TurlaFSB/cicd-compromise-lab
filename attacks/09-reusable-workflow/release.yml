@@ -1,0 +1,35 @@
+# VULNERABLE — DO NOT USE IN PRODUCTION
+#
+# Scenario 09 — reusable workflow trust boundary.
+#
+# This caller delegates its release to a reusable workflow in ANOTHER
+# organization, referenced by a MUTABLE ref, and hands it ALL of the
+# caller's secrets:
+#
+#   uses: acme-shared/pipelines/.github/workflows/release.yml@main
+#   secrets: inherit
+#
+# Two compounding problems:
+#   1. `@main` is mutable — the upstream org can change what that workflow
+#      does at any time, and the next release here silently runs the new
+#      code (the reusable-workflow form of the tag-hijack in scenario 04).
+#   2. `secrets: inherit` passes EVERY secret the caller holds to that
+#      external workflow, not just the one it needs. A compromise or a
+#      malicious change upstream gets NPM_TOKEN, DEPLOY_KEY, cloud creds —
+#      everything.
+#
+# OWASP CICD-SEC-3 (Dependency Chain Abuse), CICD-SEC-4 (Poisoned Pipeline Execution)
+# MITRE ATT&CK T1195.001 (Compromise Software Dependencies and Development Tools)
+
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+jobs:
+  release:
+    # VULNERABLE: external reusable workflow by mutable ref.
+    uses: acme-shared/pipelines/.github/workflows/release.yml@main
+    # VULNERABLE: hands over every secret the caller has.
+    secrets: inherit

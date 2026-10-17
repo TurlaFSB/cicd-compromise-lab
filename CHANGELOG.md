@@ -5,6 +5,7 @@ All notable changes to this project are documented here. The format follows [Kee
 ## [Unreleased]
 
 ### Added
+- **Scenario 09 — reusable workflow trust boundary:** vulnerable caller using a mutable `@main` ref with `secrets: inherit`, three-vector scanner that separates job-level `uses:` from step-level actions, Sigma rule, hardened caller pinned by SHA with explicitly named secrets, 7 verification checks.
 - **Scenario 08 — GITHUB_ENV / GITHUB_PATH injection:** vulnerable workflow writing untrusted issue text to the runner env files, three-vector scanner, an injection simulation (NODE_OPTIONS smuggled via GITHUB_ENV), Sigma rule, hardened workflow passing untrusted data via step-scoped `env:` with a safe heredoc cross-step pattern, 9 verification checks.
 - **Scenario 07 — self-hosted runner persistence:** vulnerable workflow running untrusted PR code on a self-hosted runner, three-vector scanner, a persistence simulation (reused vs ephemeral runner), Sigma rule, hardened workflow on ephemeral GitHub-hosted runners, 9 verification checks.
 - **Scenario 06 — artifact tampering:** vulnerable build→publish workflow (no integrity binding), three-vector scanner, a concrete tamper simulation (hash → tamper → verify), Sigma rule, hardened workflow using `actions/attest-build-provenance` + `gh attestation verify`, 10 verification checks.
@@ -27,7 +28,7 @@ All notable changes to this project are documented here. The format follows [Kee
 - Attack driver now commits as the maintainer's current identity; author email in captured scenario 01 evidence redacted.
 
 ### Planned
-- Scenarios 09–10 (reusable workflow trust boundary, `GITHUB_TOKEN` over-privilege).
+- Scenario 10 (`GITHUB_TOKEN` over-privilege).
 - Scenarios 11–14 (`workflow_run` artifact poisoning, OIDC trust misconfiguration, credential leakage via artifacts, dependency confusion).
 - An empirical scan of public repositories, compared against `zizmor` and `actionlint`.
 
