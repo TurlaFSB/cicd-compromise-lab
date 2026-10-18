@@ -1,0 +1,18 @@
+{
+  "_comment": "VULNERABLE AWS IAM role trust policy (lab fixture, scenario 12). This is the CLOUD side of the misconfiguration — it lives in AWS IAM, not in the GitHub repo, and it decides which GitHub Actions OIDC tokens may assume this role. Account id and ARNs are dummy lab values.",
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Principal": {
+        "Federated": "arn:aws:iam::123456789012:oidc-provider/token.actions.githubusercontent.com"
+      },
+      "Action": "sts:AssumeRoleWithWebIdentity",
+      "Condition": {
+        "StringLike": {
+          "token.actions.githubusercontent.com:sub": "repo:turla-lab-targets/*"
+        }
+      }
+    }
+  ]
+}

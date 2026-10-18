@@ -1,0 +1,19 @@
+{
+  "_comment": "HARDENED AWS IAM role trust policy (lab fixture, scenario 12). It pins the audience and the exact subject — one repository, one ref — so only the intended workflow on the intended branch can assume the role. Account id and ARNs are dummy lab values.",
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Principal": {
+        "Federated": "arn:aws:iam::123456789012:oidc-provider/token.actions.githubusercontent.com"
+      },
+      "Action": "sts:AssumeRoleWithWebIdentity",
+      "Condition": {
+        "StringEquals": {
+          "token.actions.githubusercontent.com:aud": "sts.amazonaws.com",
+          "token.actions.githubusercontent.com:sub": "repo:turla-lab-targets/oidc-trust-target:ref:refs/heads/main"
+        }
+      }
+    }
+  ]
+}

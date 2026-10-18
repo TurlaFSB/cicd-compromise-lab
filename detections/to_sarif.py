@@ -78,6 +78,10 @@ SCENARIOS = {
         "workflow_run artifact poisoning",
         "https://owasp.org/www-project-top-10-ci-cd-security-risks/CICD-SEC-04-Poisoned-Pipeline-Execution",
     ),
+    "12-oidc-trust-policy": (
+        "OIDC trust policy misconfiguration",
+        "https://owasp.org/www-project-top-10-ci-cd-security-risks/CICD-SEC-05-Insufficient-PBAC",
+    ),
 }
 
 # Matches "<file>" or "<file>:<line>" then ": <message>".
@@ -127,9 +131,14 @@ def parse(stream):
             rule_id = sid
             vector_title = None
 
-        # Detectors print the workflow basename; GitHub maps SARIF to source
+        # Most detectors print a workflow basename; GitHub maps SARIF to source
         # by repo-relative path, and lab workflows live under .github/workflows.
-        uri = ".github/workflows/{}".format(fname)
+        # A finding that already carries a path (contains "/") or names a
+        # non-workflow file (e.g. an OIDC trust policy *.json) is used as-is.
+        if "/" in fname or not fname.endswith((".yml", ".yaml")):
+            uri = fname
+        else:
+            uri = ".github/workflows/{}".format(fname)
         yield sid, rule_id, vector_title, uri, lineno, msg
 
 

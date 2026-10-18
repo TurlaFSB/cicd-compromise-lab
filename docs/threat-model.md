@@ -139,6 +139,15 @@ Each scenario below becomes its own folder under `attacks/`, `hardened/`, and `d
 **Impact:** full secret exposure and arbitrary privileged code execution from an unmerged fork pull request.
 **Fix:** upload only minimal, validated data (a PR number) from the producer; in the handler, never check out the head or execute the artifact, pass `workflow_run` context via `env:`, and keep a read-only floor with `pull-requests: write` only on the job. See `hardened/11-workflow-run-poisoning/`.
 
+### 12 — OIDC trust policy misconfiguration ✅
+
+**Status:** Complete — detection operational (5 vectors across cloud policy + workflow, plus subject-matching simulation), hardened configuration verified (14/14 checks pass).
+
+**Technique:** a cloud OIDC trust policy accepts an over-broad GitHub subject (`repo:org/*`, any ref) or pins no audience, while the workflow grants `id-token: write` broadly (workflow level, untrusted trigger). Any run the org can start — a fork PR included — mints a token the policy admits and exchanges it for real cloud credentials.
+**OWASP:** CICD-SEC-5 (Insufficient PBAC), CICD-SEC-2 (Inadequate IAM) · **ATT&CK:** T1078.004 (Valid Accounts: Cloud Accounts)
+**Impact:** an unintended or fork-controlled run assumes a cloud role and acts in the account with no stored secret to steal.
+**Fix:** `StringEquals` on both `sub` (one repo + ref, or a protected environment) and `aud`; `id-token: write` per job under a read-only floor; deploy only from trusted triggers. See `hardened/12-oidc-trust-policy/`.
+
 ## Detection strategy
 
 Each scenario gets a corresponding detection in `detections/`, expressed as:

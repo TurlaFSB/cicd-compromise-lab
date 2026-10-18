@@ -1,0 +1,49 @@
+# attacks/12-oidc-trust-policy/deploy.yml  —  VULNERABLE (GitHub side)
+#
+# Scenario 12 — OIDC trust policy misconfiguration (CICD-SEC-2, CICD-SEC-5,
+# MITRE T1078.004).
+#
+# OIDC lets a workflow swap a short-lived GitHub-signed token for real cloud
+# credentials, with no long-lived secret stored anywhere. What a given token
+# may assume is decided entirely by the CLOUD-side trust policy (see
+# trust-policy.json). Two mistakes combine here:
+#
+#   * The trust policy accepts `repo:turla-lab-targets/*` for ANY ref and does
+#     not pin the audience — so a token minted by any workflow in the org, on
+#     any branch or any fork-PR run, can assume the role.
+#   * This workflow hands `id-token: write` to the whole workflow and runs on
+#     `pull_request_target`, a trigger a fork PR can reach. A fork that lands
+#     an injected step (see the earlier injection scenarios) can mint an OIDC
+#     token and exchange it for the role's cloud credentials.
+#
+# Each mistake is bad alone; together they let an external contributor reach
+# the cloud account. All ARNs and ids are dummy lab values.
+
+name: Preview deploy
+
+on:
+  pull_request_target:
+
+# id-token granted workflow-wide: every job can mint a cloud token.
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+
+      - name: Configure AWS credentials via OIDC
+        uses: aws-actions/configure-aws-credentials@b47578312673ae6fa5b5096b330d9fbac3d116df # v4.2.1
+        with:
+          role-to-assume: arn:aws:iam::123456789012:role/lab-preview-deploy
+          aws-region: us-east-1
+
+      - name: Deploy preview
+        run: |
+          echo "deploying preview for PR #${{ github.event.pull_request.number }}"
+          aws sts get-caller-identity

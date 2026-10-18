@@ -17,6 +17,7 @@ Each scenario's intentionally vulnerable workflow lives in a separate public rep
 | 09 — Reusable workflow trust boundary | `turla-lab-targets/reusable-workflow-target` | `.github/workflows/release.yml` | `push: tags` |
 | 10 — GITHUB_TOKEN over-privilege | `turla-lab-targets/token-overprivilege-target` | `.github/workflows/ci.yml` | `pull_request_target` |
 | 11 — workflow_run artifact poisoning | `turla-lab-targets/workflow-run-poisoning-target` | `.github/workflows/build.yml` + `comment.yml` | `pull_request` / `workflow_run` |
+| 12 — OIDC trust policy misconfiguration | `turla-lab-targets/oidc-trust-target` | `.github/workflows/deploy.yml` + cloud-side `trust-policy.json` | `pull_request_target` |
 
 ## Safety rules
 

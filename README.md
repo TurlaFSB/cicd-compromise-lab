@@ -34,7 +34,7 @@ CI/CD pipelines hold secrets, publish artifacts, and deploy to production — ma
 | 09 | Reusable workflow trust boundary | CICD-SEC-3, CICD-SEC-4 | T1195.001 | Complete |
 | 10 | `GITHUB_TOKEN` over-privilege | CICD-SEC-5, CICD-SEC-2 | T1078.004 | Complete |
 | 11 | [`workflow_run` artifact poisoning](#scenario-11--workflow_run-artifact-poisoning) | CICD-SEC-4 | T1195 | Complete |
-| 12 | OIDC trust policy misconfiguration | CICD-SEC-2, CICD-SEC-5 | T1078.004 | Planned |
+| 12 | [OIDC trust policy misconfiguration](#scenario-12--oidc-trust-policy-misconfiguration) | CICD-SEC-2, CICD-SEC-5 | T1078.004 | Complete |
 | 13 | Credential leakage via artifacts | CICD-SEC-6 | T1552.001 | Planned |
 | 14 | Dependency confusion and install-script abuse | CICD-SEC-3 | T1195.001 | Planned |
 
@@ -126,6 +126,14 @@ A `pull_request` build uploads its whole tree as an artifact; a privileged `work
 
 **Verification:** 11/11 checks pass. Three-vector scanner (untrusted context in `run:`, head checkout, poisoned-artifact execution) over a parser that separates the `workflow_run` trigger from the context object; artifact download alone is an informational note, not a finding.
 
+### Scenario 12 — OIDC trust policy misconfiguration
+
+OIDC replaces long-lived cloud keys with a short-lived GitHub-signed token; the cloud-side trust policy decides which tokens may assume a role. Here the AWS trust policy accepts `repo:turla-lab-targets/*` for any ref and pins no audience, and the workflow hands `id-token: write` to every job on a `pull_request_target` trigger. Any run the org can start — a fork PR included — can mint a token and exchange it for the role's credentials.
+
+**Fix:** pin the trust policy's `sub` to one repo and ref (or a protected environment) with `StringEquals` and add a `StringEquals` `aud` condition; grant `id-token: write` on the single deploy job under a read-only floor; deploy only from trusted triggers. The scanner checks both halves — the IAM trust-policy JSON and the workflow — and a simulation (`attacks/12-oidc-trust-policy/simulate.sh`) models the STS subject match offline.
+
+**Verification:** 14/14 checks pass. Five-vector scanner spanning the cloud policy (wildcard subject, missing subject, missing audience) and the workflow (workflow-level id-token, id-token on an untrusted trigger); trust-policy JSON parsed by `policy.py`.
+
 ## Architecture
 
 Every scenario repeats the same four-folder layout, so the tree below shows
@@ -155,7 +163,8 @@ cicd-compromise-lab/
 ├── scenarios: 01-pwn-request  02-script-injection  03-secret-exfil
 │              04-tag-hijack   05-cache-poisoning   06-artifact-tampering
 │              07-runner-persistence   08-env-injection   09-reusable-workflow
-│              10-token-overprivilege   11-workflow-run-poisoning   (12+ planned)
+│              10-token-overprivilege   11-workflow-run-poisoning
+│              12-oidc-trust-policy   (13+ planned)
 │
 ├── docs/threat-model.md         ← system under test, trust boundaries, scenario catalog
 ├── tests/fixtures/              ← known-vulnerable workflow used by the action self-test
@@ -325,7 +334,8 @@ Each scenario has its own documentation at four levels of detail:
 - [x] Reusable GitHub Action wrapper and `lab pin` auto-fix for unpinned actions
 - [x] Unified scanner (`lab scan`) across all scenarios, with SARIF output for GitHub code scanning
 - [x] Scenario 11 — `workflow_run` artifact poisoning
-- [ ] Scenarios 12–14 — OIDC misconfiguration, artifact credential leakage, dependency confusion
+- [x] Scenario 12 — OIDC trust policy misconfiguration
+- [ ] Scenarios 13–14 — artifact credential leakage, dependency confusion
 - [ ] Empirical scan of public repositories and comparison against `zizmor` and `actionlint`
 - [ ] Jenkins phase 2 (separate top-level folder or repo)
 

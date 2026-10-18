@@ -1,0 +1,48 @@
+title: GitHub Actions OIDC id-token Over-Exposure
+id: 3b9f6e21-0c74-4d58-ae13-9f2b7c4d85a6
+status: experimental
+description: |
+  Detects GitHub Actions workflows that expose the OIDC token-minting
+  capability (id-token: write) too broadly — granted at workflow level so
+  every job can mint a cloud token, or reachable from a trigger an outsider
+  can fire (pull_request_target, workflow_run, issue_comment, ...). Combined
+  with an over-broad cloud-side trust policy, this lets an unintended or
+  fork-controlled run exchange a GitHub OIDC token for real cloud credentials.
+
+  This rule covers the GitHub side (the workflow definition). The cloud-side
+  trust policy — a wildcard or unpinned-audience condition on
+  token.actions.githubusercontent.com — lives in AWS/GCP/Azure IAM, not in the
+  repository, and is checked by this scenario's detect.sh / policy.py instead.
+references:
+  - https://owasp.org/www-project-top-10-ci-cd-security-risks/CICD-SEC-05-Insufficient-PBAC
+  - https://owasp.org/www-project-top-10-ci-cd-security-risks/CICD-SEC-02-Inadequate-Identity-And-Access-Management
+  - https://docs.github.com/en/actions/deployment/security-hardening-your-deployments/about-security-hardening-with-openid-connect
+  - https://docs.github.com/en/actions/deployment/security-hardening-your-deployments/configuring-openid-connect-in-amazon-web-services
+author: TurlaFSB
+date: 2026-10-18
+tags:
+  - attack.t1078.004
+  - attack.persistence
+  - attack.privilege_escalation
+  - cicd_sec_5
+  - cicd_sec_2
+logsource:
+  category: ci_cd
+  product: github_actions
+  service: workflow_definition
+detection:
+  grants_id_token:
+    permissions|re: 'id-token:\s*write'
+  workflow_level_block:
+    # id-token: write under a column-0 permissions block (workflow-wide).
+    definition|re: '(?m)^permissions:\s*\n(?:[ \t]+.*\n)*?[ \t]+id-token:\s*write'
+  untrusted_trigger:
+    trigger|re: '(pull_request_target|workflow_run|issue_comment|issues|pull_request_review|discussion)'
+  condition: grants_id_token and (workflow_level_block or untrusted_trigger)
+falsepositives:
+  - A deploy workflow that grants id-token write on a single job and runs only
+    on a trusted trigger (push to a protected branch, a tag, or a protected
+    environment) is the intended pattern and should not match.
+  - Reusable/deployment workflows where the cloud trust policy already pins the
+    exact sub and aud may accept a broader workflow grant; review both halves.
+level: high

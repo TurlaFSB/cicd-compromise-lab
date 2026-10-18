@@ -1,0 +1,49 @@
+# hardened/12-oidc-trust-policy/deploy.yml  —  HARDENED (GitHub side)
+#
+# Scenario 12 — OIDC trust policy misconfiguration, fixed on the GitHub side.
+# The matching cloud-side fix is in trust-policy.json (pinned aud + exact sub).
+#
+# Changes:
+#   * Runs only on a push to main — a trusted trigger an outsider cannot reach.
+#     Fork PRs never start this workflow, so there is no untrusted path to the
+#     OIDC token.
+#   * `id-token: write` is granted on the one job that assumes the role, under a
+#     read-only workflow floor — not workflow-wide.
+#   * The AWS audience is set explicitly, matching the StringEquals :aud
+#     condition the hardened trust policy now requires.
+#
+# With the hardened trust policy pinning `sub` to this repo + ref, even a token
+# minted elsewhere in the org cannot assume the role. All ids are dummy values.
+
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+
+# Read-only floor; no token-minting ability by default.
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write      # only this job may mint an OIDC token
+      contents: read
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+
+      - name: Configure AWS credentials via OIDC
+        uses: aws-actions/configure-aws-credentials@b47578312673ae6fa5b5096b330d9fbac3d116df # v4.2.1
+        with:
+          role-to-assume: arn:aws:iam::123456789012:role/lab-deploy
+          aws-region: us-east-1
+          audience: sts.amazonaws.com
+
+      - name: Deploy
+        run: |
+          echo "deploying from the default branch"
+          aws sts get-caller-identity

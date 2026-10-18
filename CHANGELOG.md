@@ -5,6 +5,7 @@ All notable changes to this project are documented here. The format follows [Kee
 ## [Unreleased]
 
 ### Added
+- **Scenario 12 — OIDC trust policy misconfiguration:** a vulnerable AWS IAM trust policy (`repo:org/*` wildcard subject, no `aud` condition) paired with a workflow that grants `id-token: write` workflow-wide on `pull_request_target`; a five-vector scanner spanning both the cloud policy (parsed by `policy.py`) and the workflow; an offline STS subject-matching simulation; Sigma rule for the workflow side; hardened policy pinning `sub` + `aud` with `StringEquals` and a workflow granting `id-token` per job on a trusted trigger; 14 verification checks. `to_sarif.py` now maps non-workflow findings (the trust-policy JSON) to their real path instead of forcing the `.github/workflows/` prefix.
 - **Scenario 11 — `workflow_run` artifact poisoning:** a `pull_request` producer that uploads its whole tree and a privileged `workflow_run` consumer that downloads it, checks out the fork's head, and executes code from it; a three-vector scanner (untrusted `workflow_run` context in `run:`, head checkout, poisoned-artifact execution) over an awk parser that separates the `workflow_run` trigger from the context object; an offline poisoning simulation (blind vs. validating consumer); Sigma rule; hardened pair that uploads only a validated PR number and treats the artifact as untrusted data; 11 verification checks.
 - **Scenario 10 — `GITHUB_TOKEN` over-privilege:** three vulnerable workflows (`write-all` on `pull_request_target`, no permissions block, high-risk write on `issue_comment`), a four-vector scanner built on a shared awk permissions parser, an effective-token simulation that maps each write scope to what it unlocks, Sigma rule, hardened workflows with a read-only floor and per-job grants, 15 verification checks.
 - SARIF rule metadata (title and OWASP link) for scenarios 06–10 in `to_sarif.py`; previously they fell back to the default link.
@@ -34,7 +35,7 @@ All notable changes to this project are documented here. The format follows [Kee
 - Attack driver now commits as the maintainer's current identity; author email in captured scenario 01 evidence redacted.
 
 ### Planned
-- Scenarios 12–14 (OIDC trust misconfiguration, credential leakage via artifacts, dependency confusion).
+- Scenarios 13–14 (credential leakage via artifacts, dependency confusion).
 - An empirical scan of public repositories, compared against `zizmor` and `actionlint`.
 
 ## 2026-10-11
