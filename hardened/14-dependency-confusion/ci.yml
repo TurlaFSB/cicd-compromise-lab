@@ -1,0 +1,54 @@
+# hardened/14-dependency-confusion/ci.yml  —  HARDENED
+#
+# Scenario 14 — dependency confusion and install-script abuse, fixed.
+#
+#   1. `npm ci` installs exactly the locked versions from package-lock.json and
+#      fails if the lockfile and manifest disagree — no fresh resolution that
+#      could swap in a public package.
+#   2. `--ignore-scripts` stops dependency lifecycle scripts from running at
+#      install time. (The project configures ignore-scripts=true in .npmrc too,
+#      so the flag is belt-and-braces.)
+#   3. The remote bootstrap is gone. A tool that must be fetched is downloaded
+#      to a file, checksum-verified against a pinned digest, and only then run
+#      — never piped from the network straight into a shell.
+#
+# With the @turla-lab scope pinned to the internal registry in .npmrc, the
+# internal package can only ever come from the internal registry.
+
+name: CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@39370e3970a6d050c480ffad4ff0ed4d3fdee5af # v4.1.0
+        with:
+          node-version: "20"
+
+      # Fetch-then-verify instead of curl | sh: download, check the digest,
+      # then run. A tampered or swapped script fails the checksum and aborts.
+      - name: Bootstrap toolchain
+        env:
+          SETUP_SHA256: 2c26b46b68ffc68ff99b453c1d30413413422d706483bfa0f98a5e886266e7ae
+        run: |
+          curl -fsSL https://install.example.test/setup.sh -o setup.sh
+          echo "${SETUP_SHA256}  setup.sh" | sha256sum --check
+          sh ./setup.sh
+
+      # Locked versions, lifecycle scripts disabled.
+      - name: Install dependencies
+        run: npm ci --ignore-scripts
+
+      - name: Test
+        run: npm test

@@ -19,6 +19,7 @@ Each scenario's intentionally vulnerable workflow lives in a separate public rep
 | 11 — workflow_run artifact poisoning | `turla-lab-targets/workflow-run-poisoning-target` | `.github/workflows/build.yml` + `comment.yml` | `pull_request` / `workflow_run` |
 | 12 — OIDC trust policy misconfiguration | `turla-lab-targets/oidc-trust-target` | `.github/workflows/deploy.yml` + cloud-side `trust-policy.json` | `pull_request_target` |
 | 13 — Credential leakage via artifacts | `turla-lab-targets/artifact-cred-leak-target` | `.github/workflows/release.yml` | `push` |
+| 14 — Dependency confusion / install-script abuse | `turla-lab-targets/dependency-confusion-target` | `.github/workflows/ci.yml` + `.npmrc` + `package.json` | `push` / `pull_request` |
 
 ## Safety rules
 

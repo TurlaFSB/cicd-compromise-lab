@@ -86,6 +86,10 @@ SCENARIOS = {
         "Credential leakage via artifacts",
         "https://owasp.org/www-project-top-10-ci-cd-security-risks/CICD-SEC-06-Insufficient-Credential-Hygiene",
     ),
+    "14-dependency-confusion": (
+        "Dependency confusion / install-script abuse",
+        "https://owasp.org/www-project-top-10-ci-cd-security-risks/CICD-SEC-03-Dependency-Chain-Abuse",
+    ),
 }
 
 # Matches "<file>" or "<file>:<line>" then ": <message>".

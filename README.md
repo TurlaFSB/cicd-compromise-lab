@@ -36,7 +36,7 @@ CI/CD pipelines hold secrets, publish artifacts, and deploy to production — ma
 | 11 | [`workflow_run` artifact poisoning](#scenario-11--workflow_run-artifact-poisoning) | CICD-SEC-4 | T1195 | Complete |
 | 12 | [OIDC trust policy misconfiguration](#scenario-12--oidc-trust-policy-misconfiguration) | CICD-SEC-2, CICD-SEC-5 | T1078.004 | Complete |
 | 13 | [Credential leakage via artifacts](#scenario-13--credential-leakage-via-artifacts) | CICD-SEC-6 | T1552.001 | Complete |
-| 14 | Dependency confusion and install-script abuse | CICD-SEC-3 | T1195.001 | Planned |
+| 14 | [Dependency confusion and install-script abuse](#scenario-14--dependency-confusion-and-install-script-abuse) | CICD-SEC-3 | T1195.001 | Complete |
 
 ### Scenario 01 — Pwn request
 
@@ -142,6 +142,14 @@ A build job leaks secrets into the artifact it uploads: `actions/checkout` persi
 
 **Verification:** 14/14 checks pass. Four-vector step-aware scanner (persisted checkout credential, secret written to file, broad upload path, hidden files in artifact) over `leak.awk`.
 
+### Scenario 14 — dependency confusion and install-script abuse
+
+The install phase runs the most third-party code in CI, and this job is open to two supply-chain attacks: `npm install` with the internal `@turla-lab` scope unpinned lets an attacker's higher-versioned public package of the same name win (dependency confusion), and installs run lifecycle scripts by default, so a malicious package executes code at install time. A `curl | sh` bootstrap runs whatever the server returns on top of that.
+
+**Fix:** `npm ci --ignore-scripts` (locked versions, no scripts); pin internal scopes in `.npmrc` (`@turla-lab:registry=…`) and set `ignore-scripts=true`; replace `curl | sh` with download-verify-checksum-then-run. The scanner checks both the workflow and `package.json`/`.npmrc`, and a simulation (`attacks/14-dependency-confusion/simulate.sh`) shows the public package winning resolution and a dependency `postinstall` executing.
+
+**Verification:** 15/15 checks pass. Four-vector scanner across the workflow (pipe-to-shell, no-lockfile install, install scripts enabled) and the npm config (unpinned scope, via `npmcheck.py`).
+
 ## Architecture
 
 Every scenario repeats the same four-folder layout, so the tree below shows
@@ -172,7 +180,8 @@ cicd-compromise-lab/
 │              04-tag-hijack   05-cache-poisoning   06-artifact-tampering
 │              07-runner-persistence   08-env-injection   09-reusable-workflow
 │              10-token-overprivilege   11-workflow-run-poisoning
-│              12-oidc-trust-policy   13-artifact-cred-leak   (14 planned)
+│              12-oidc-trust-policy   13-artifact-cred-leak
+│              14-dependency-confusion
 │
 ├── docs/threat-model.md         ← system under test, trust boundaries, scenario catalog
 ├── tests/fixtures/              ← known-vulnerable workflow used by the action self-test
@@ -319,8 +328,8 @@ This lab maps each scenario to established security frameworks:
 
 | Framework | Coverage |
 |---|---|
-| [OWASP Top 10 CI/CD Security Risks](https://owasp.org/www-project-top-10-ci-cd-security-risks/) | CICD-SEC-1, 3, 4, 5, 6, 7, 9 |
-| [MITRE ATT&CK](https://attack.mitre.org/) | T1059.004, T1195, T1195.001, T1195.002, T1552 |
+| [OWASP Top 10 CI/CD Security Risks](https://owasp.org/www-project-top-10-ci-cd-security-risks/) | CICD-SEC-1, 2, 3, 4, 5, 6, 7, 9 |
+| [MITRE ATT&CK](https://attack.mitre.org/) | T1053, T1059.004, T1078.004, T1195, T1195.001, T1195.002, T1547, T1552, T1552.001, T1574 |
 | [SLSA](https://slsa.dev/) | Build Level 2–3 targeted for hardened pipelines |
 | [Sigma](https://sigmahq.io/) | Detection rules follow the Sigma specification |
 
@@ -344,7 +353,8 @@ Each scenario has its own documentation at four levels of detail:
 - [x] Scenario 11 — `workflow_run` artifact poisoning
 - [x] Scenario 12 — OIDC trust policy misconfiguration
 - [x] Scenario 13 — credential leakage via artifacts
-- [ ] Scenario 14 — dependency confusion and install-script abuse
+- [x] Scenario 14 — dependency confusion and install-script abuse
+- All 14 planned scenarios complete (14/14)
 - [ ] Empirical scan of public repositories and comparison against `zizmor` and `actionlint`
 - [ ] Jenkins phase 2 (separate top-level folder or repo)
 

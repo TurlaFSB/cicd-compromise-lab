@@ -157,6 +157,15 @@ Each scenario below becomes its own folder under `attacks/`, `hardened/`, and `d
 **Impact:** long-lived tokens (npm, cloud, deploy keys) and the checkout token exposed to anyone with artifact access.
 **Fix:** `persist-credentials: false`, secrets via `env:` not disk, upload only build output, no forced hidden files. See `hardened/13-artifact-cred-leak/`.
 
+### 14 — dependency confusion and install-script abuse ✅
+
+**Status:** Complete — detection operational (4 vectors across workflow + npm config, plus resolution/install-script simulation), hardened configuration verified (15/15 checks pass).
+
+**Technique:** the install phase pulls or runs attacker code — `npm install` with an unpinned internal scope lets a higher-versioned public package of the same name win (dependency confusion); installs run lifecycle scripts by default; and `curl | sh` runs an unverified remote script.
+**OWASP:** CICD-SEC-3 (Dependency Chain Abuse) · **ATT&CK:** T1195.001 (Compromise Software Dependencies and Development Tools)
+**Impact:** arbitrary code execution at install time, before any test or review, from a package or script the project never intended to run.
+**Fix:** `npm ci --ignore-scripts`, pin internal scopes to a private registry (`@scope:registry=`) with `ignore-scripts=true`, and fetch-verify-then-run instead of piping the network into a shell. See `hardened/14-dependency-confusion/`.
+
 ## Detection strategy
 
 Each scenario gets a corresponding detection in `detections/`, expressed as:

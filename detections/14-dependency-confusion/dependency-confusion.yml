@@ -1,0 +1,46 @@
+title: GitHub Actions Dependency Confusion / Install-Script Abuse
+id: 5e8d1a6c-7b24-4f90-a3c1-0d9f2e4b76a8
+status: experimental
+description: |
+  Detects CI workflows whose install phase can run attacker-controlled code or
+  pull an attacker-controlled package: a remote script piped straight into a
+  shell; a package install that runs dependency lifecycle scripts (no
+  --ignore-scripts); or `npm install` instead of `npm ci`, which resolves
+  versions fresh and can prefer a higher-versioned public package over an
+  internal one (dependency confusion). The matching .npmrc / package.json check
+  — a scoped dependency with no registry pin — is handled by this scenario's
+  detect.sh / npmcheck.py.
+
+  This rule fires on the workflow definition (YAML), not on runtime log events.
+references:
+  - https://owasp.org/www-project-top-10-ci-cd-security-risks/CICD-SEC-03-Dependency-Chain-Abuse
+  - https://docs.github.com/en/actions/security-for-github-actions/security-guides/security-hardening-for-github-actions
+  - https://docs.npmjs.com/cli/v10/commands/npm-ci
+  - https://blog.npmjs.org/post/scoped-packages-and-registries
+author: TurlaFSB
+date: 2026-10-18
+tags:
+  - attack.t1195.001
+  - attack.supply_chain_compromise
+  - attack.execution
+  - cicd_sec_3
+logsource:
+  category: ci_cd
+  product: github_actions
+  service: workflow_definition
+detection:
+  pipe_to_shell:
+    run|re: '(curl|wget)[^|]*\|\s*(sudo\s+)?(sh|bash)(\s|$)'
+  npm_install_fresh:
+    run|re: 'npm\s+(install|i)(\s|$)'
+  install_no_ignore_scripts:
+    run|re: 'npm\s+(install|i|ci)(\s|$)'
+  has_ignore_scripts:
+    run|re: '--ignore-scripts'
+  condition: pipe_to_shell or npm_install_fresh or (install_no_ignore_scripts and not has_ignore_scripts)
+falsepositives:
+  - A workflow that runs `npm ci --ignore-scripts` with internal scopes pinned
+    in .npmrc is the intended pattern and should not match.
+  - Projects that deliberately need lifecycle scripts (native builds) may run
+    installs without --ignore-scripts; those should vet scripts another way.
+level: high

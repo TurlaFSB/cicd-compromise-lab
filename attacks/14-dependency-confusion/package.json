@@ -1,0 +1,13 @@
+{
+  "name": "turla-lab-app",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Lab fixture (scenario 14). Depends on an internal scoped package whose scope is not pinned to a private registry in .npmrc — the dependency-confusion exposure.",
+  "dependencies": {
+    "@turla-lab/internal-utils": "^1.2.0",
+    "lodash": "^4.17.21"
+  },
+  "devDependencies": {
+    "@turla-lab/test-helpers": "^0.3.0"
+  }
+}

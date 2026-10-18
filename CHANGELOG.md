@@ -5,6 +5,7 @@ All notable changes to this project are documented here. The format follows [Kee
 ## [Unreleased]
 
 ### Added
+- **Scenario 14 — dependency confusion and install-script abuse:** a vulnerable `ci.yml` (`curl | sh`, `npm install` with lifecycle scripts) plus an `.npmrc`/`package.json` with an unpinned internal scope; a four-vector scanner across the workflow and the npm config (the scope check via `npmcheck.py`); an offline simulation showing the public package winning resolution and a dependency `postinstall` executing; Sigma rule; hardened config with `npm ci --ignore-scripts`, a pinned `@turla-lab` scope, `ignore-scripts=true`, and a fetch-verify-then-run bootstrap; 15 verification checks. Completes all 14 planned scenarios.
 - **Scenario 13 — credential leakage via artifacts:** a vulnerable `release.yml` that leaks secrets four ways (persisted checkout token in `.git/config`, npm token written to `.npmrc`, `path: .` upload, `include-hidden-files: true`); a four-vector step-aware scanner over `leak.awk`; an offline leak simulation that archives a workspace two ways and greps for the secret; Sigma rule; hardened workflow with `persist-credentials: false`, env-only secrets, and a scoped `dist/` upload; 14 verification checks.
 - **Scenario 12 — OIDC trust policy misconfiguration:** a vulnerable AWS IAM trust policy (`repo:org/*` wildcard subject, no `aud` condition) paired with a workflow that grants `id-token: write` workflow-wide on `pull_request_target`; a five-vector scanner spanning both the cloud policy (parsed by `policy.py`) and the workflow; an offline STS subject-matching simulation; Sigma rule for the workflow side; hardened policy pinning `sub` + `aud` with `StringEquals` and a workflow granting `id-token` per job on a trusted trigger; 14 verification checks. `to_sarif.py` now maps non-workflow findings (the trust-policy JSON) to their real path instead of forcing the `.github/workflows/` prefix.
 - **Scenario 11 — `workflow_run` artifact poisoning:** a `pull_request` producer that uploads its whole tree and a privileged `workflow_run` consumer that downloads it, checks out the fork's head, and executes code from it; a three-vector scanner (untrusted `workflow_run` context in `run:`, head checkout, poisoned-artifact execution) over an awk parser that separates the `workflow_run` trigger from the context object; an offline poisoning simulation (blind vs. validating consumer); Sigma rule; hardened pair that uploads only a validated PR number and treats the artifact as untrusted data; 11 verification checks.
@@ -36,7 +37,6 @@ All notable changes to this project are documented here. The format follows [Kee
 - Attack driver now commits as the maintainer's current identity; author email in captured scenario 01 evidence redacted.
 
 ### Planned
-- Scenario 14 (dependency confusion and install-script abuse).
 - An empirical scan of public repositories, compared against `zizmor` and `actionlint`.
 
 ## 2026-10-11

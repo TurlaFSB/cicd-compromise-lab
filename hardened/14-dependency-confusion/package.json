@@ -1,0 +1,13 @@
+{
+  "name": "turla-lab-app",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Lab fixture (scenario 14, hardened). The internal scope is pinned to the internal registry in .npmrc, so @turla-lab/* can only resolve from there.",
+  "dependencies": {
+    "@turla-lab/internal-utils": "^1.2.0",
+    "lodash": "^4.17.21"
+  },
+  "devDependencies": {
+    "@turla-lab/test-helpers": "^0.3.0"
+  }
+}

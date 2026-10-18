@@ -1,0 +1,51 @@
+# attacks/14-dependency-confusion/ci.yml  —  VULNERABLE
+#
+# Scenario 14 — dependency confusion and install-script abuse
+# (CICD-SEC-3, MITRE T1195.001).
+#
+# The install phase is where a supply-chain attack lands. This job gets it
+# wrong in three ways:
+#
+#   1. `npm install` (not `npm ci`) resolves versions fresh against the
+#      configured registries. With the internal scope unpinned (see .npmrc),
+#      npm can pick an attacker's higher-versioned PUBLIC package in place of
+#      the private one — classic dependency confusion.
+#   2. No `--ignore-scripts`, so every dependency's preinstall/install/
+#      postinstall lifecycle script runs — attacker code executes at install
+#      time, before any test or review.
+#   3. A remote bootstrap script is piped straight into a shell, running
+#      whatever the server returns today, unverified.
+#
+# See .npmrc and package.json in this directory for the confusable scope.
+
+name: CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@39370e3970a6d050c480ffad4ff0ed4d3fdee5af # v4.1.0
+        with:
+          node-version: "20"
+
+      # Remote script piped to a shell — runs whatever the server serves now.
+      - name: Bootstrap toolchain
+        run: curl -fsSL https://install.example.test/setup.sh | sh
+
+      # Fresh resolution + lifecycle scripts enabled.
+      - name: Install dependencies
+        run: npm install
+
+      - name: Test
+        run: npm test
