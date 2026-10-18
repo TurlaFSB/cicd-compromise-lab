@@ -1,5 +1,5 @@
 name: CI/CD Compromise Lab Scanner
-description: Scan a repository's GitHub Actions workflows for pwn requests, script injection, secret exfiltration and mutable action tags.
+description: Scan a repository's GitHub Actions workflows and npm config for 14 classes of CI/CD compromise, from pwn requests and script injection to OIDC trust misconfiguration and dependency confusion.
 author: TurlaFSB
 
 branding:

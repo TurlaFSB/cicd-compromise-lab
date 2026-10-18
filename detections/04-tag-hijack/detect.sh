@@ -76,7 +76,8 @@ analyze_workflow() {
   # Extract all non-comment `uses:` lines
   # First grep -n adds "lineno:" prefix; filter comments by checking after the prefix
   local uses_lines
-  uses_lines=$(grep -n 'uses:' "$wf_file" | grep -vE '^[0-9]+:[[:space:]]*#' || true)
+  # Anchored to the YAML key: an unanchored match also hits 'statuses: read'.
+  uses_lines=$(grep -nE '^[[:space:]]*(-[[:space:]]+)?uses:[[:space:]]' "$wf_file" || true)
 
   if [ -z "$uses_lines" ]; then
     return
@@ -86,10 +87,15 @@ analyze_workflow() {
     local lineno
     lineno=$(echo "$line" | cut -d: -f1)
     local uses_value
-    uses_value=$(echo "$line" | sed 's/.*uses:[[:space:]]*//' | sed 's/[[:space:]]*#.*//' | tr -d "'\"")
+    uses_value=$(echo "$line" | sed -E 's/^[0-9]+:[[:space:]]*(-[[:space:]]+)?uses:[[:space:]]*//' | sed 's/[[:space:]]*#.*//' | tr -d "'\"")
 
     # Skip local actions (./path)
     if [[ "$uses_value" == ./* ]] || [[ "$uses_value" == ../* ]]; then
+      continue
+    fi
+
+    # Skip expression-built local paths (e.g. a workspace-relative action)
+    if [[ "$uses_value" == \$* ]]; then
       continue
     fi
 

@@ -20,7 +20,7 @@
 set -euo pipefail
 
 TARGET_REPO="turla-lab-targets/pwn-request-target"
-TARGET_CLONE="${TARGET_CLONE:-/home/claude/pwn-request-target}"
+TARGET_CLONE="${TARGET_CLONE:-$HOME/pwn-request-target}"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 EVIDENCE_DIR="$SCRIPT_DIR/evidence"
 BRANCH="attack/pwn-request-01-$(date +%s)"

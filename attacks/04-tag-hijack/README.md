@@ -23,7 +23,7 @@ A Git tag is a mutable ref. Any account with push access to the action's reposit
 | Factor | Impact |
 |---|---|
 | **Silent execution** | No notification, no diff, no approval flow. The workflow file hasn't changed — the tag it references now points elsewhere. |
-| **Fan-out** | A single popular action can be consumed by thousands of repos. The 2025 `tj-actions/changed-files` incident affected 23,000+ repositories. |
+| **Fan-out** | A single popular action can be consumed by thousands of repos. The March 2025 `tj-actions/changed-files` compromise (CVE-2025-30066) exposed roughly 23,000 repositories that referenced the action, according to public incident reports. |
 | **Full environment access** | The compromised action code runs with the same `GITHUB_TOKEN`, secrets, and environment variables as the step it replaces. |
 | **Invisible in CI logs** | Workflow logs don't show what commit a tag resolved to before vs. after the retagging. Without `@sha` pinning, there's no forensic trail. |
 

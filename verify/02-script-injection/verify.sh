@@ -68,15 +68,22 @@ verify_static() {
   # --- Check 2: detection scanner SHOULD fire on the vulnerable workflow ---
   echo ""
   echo "--- Check 2: detection scanner vs. vulnerable workflow ---"
-  local target_clone="/home/claude/script-injection-target"
-  if [ -d "$target_clone/.github/workflows" ]; then
-    if ("$DETECT" static "$target_clone" 2>/dev/null || true) | grep -q "FINDING"; then
+  # The vulnerable workflow ships in this repo, so this check runs everywhere
+  # (including CI) instead of depending on a local clone of the target repo.
+  local vuln_wf="$LAB_ROOT/attacks/02-script-injection/vulnerable-triage.yml"
+  if [ -f "$vuln_wf" ]; then
+    local vuln_repo
+    vuln_repo="$(mktemp -d)"
+    mkdir -p "$vuln_repo/.github/workflows"
+    cp "$vuln_wf" "$vuln_repo/.github/workflows/"
+    if ("$DETECT" static "$vuln_repo" 2>/dev/null || true) | grep -q "FINDING"; then
       assert_pass "detection scanner correctly flags the vulnerable workflow"
     else
       assert_fail "detection scanner missed the vulnerable workflow"
     fi
+    rm -rf "$vuln_repo"
   else
-    echo "  SKIP: vulnerable target repo not found at $target_clone — cannot cross-check."
+    assert_fail "vulnerable workflow fixture missing: attacks/02-script-injection/vulnerable-triage.yml"
   fi
 
   # --- Check 3: structural invariants of the hardened workflow ---

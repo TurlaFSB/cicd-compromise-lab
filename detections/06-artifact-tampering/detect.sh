@@ -83,6 +83,18 @@ has_verification() {
     || grep -qE 'sha256sum[[:space:]]+(-c|--check)' "$1"
 }
 
+# The workflow ships something: it publishes, or it runs on a release/tag
+# trigger. Test and coverage artifacts in ordinary CI are not tamper targets,
+# so the provenance vector only applies in this context.
+release_context() {
+  publishes "$1" && return 0
+  awk '
+    /^on:/ { in_on = 1; next }
+    in_on && /^[^[:space:]#]/ { in_on = 0 }
+    in_on { print }
+  ' "$1" | grep -qE '(^|[[:space:]])(release|tags|tags-ignore)[[:space:]]*:'
+}
+
 triggered_by_workflow_run() {
   awk '
     /^on:/ { in_on = 1; next }
@@ -110,7 +122,7 @@ analyze_workflow() {
   fi
 
   # ── Vector 2: no provenance on upload ──
-  if uploads_artifact "$wf" && ! has_provenance "$wf"; then
+  if uploads_artifact "$wf" && release_context "$wf" && ! has_provenance "$wf"; then
     finding "$base: NO PROVENANCE — an artifact is uploaded with no attestation, signature, or checksum."
     echo "  A consumer has nothing to verify. Add actions/attest-build-provenance"
     echo "  in the build job (needs id-token: write, attestations: write)."

@@ -26,6 +26,11 @@ All notable changes to this project are documented here. The format follows [Kee
 - CI workflow that runs every scenario's verification suite and `shellcheck` on each push and pull request.
 
 ### Fixed
+- Scenarios 01–03 only cross-checked their scanner against a vulnerable workflow when a target repo happened to be cloned at a hardcoded local path, so in CI that check was silently skipped. Vulnerable fixtures now ship in `attacks/` (as scenario 04 already did) and the check runs everywhere; a missing fixture fails instead of skipping. Hardcoded `/home/claude/...` paths removed from docs and `attack.sh`.
+- Scenario 04 scanner matched `uses:` anywhere on a line, so `statuses: read` was parsed as `uses: read` and reported as `NO REF`; expression-built local paths were flagged too. The match is now anchored to the YAML key. Found by scanning public repositories (nodejs/node); regression check added.
+- Scenario 06 `NO PROVENANCE` fired on every `upload-artifact`, including test and coverage artifacts in ordinary CI. It now applies only to release/publish workflows (tag or release trigger, or a publish step); regression check added.
+- Removed an AI-tooling attribution line and session link from the captured scenario 01 PR evidence (`attacks/01-pwn-request/evidence/pr.json`).
+- Reworded the `tj-actions/changed-files` impact figure in scenario 04 as a reported estimate and cited the CVE.
 - `hardened/04-tag-hijack/ci.yml` referenced a fabricated placeholder commit SHA for `turla-lab-targets/lab-helper-action`; replaced with the real benign `v1.0.0` commit so the pin resolves.
 - SARIF conversion (`to_sarif.py`) dropped per-vector rule ids for findings whose vector name contained an underscore (`GITHUB_ENV`, `WORKFLOW_RUN`), collapsing them to the generic scenario rule; the vector pattern now allows underscores, restoring distinct rules for scenarios 08 and 11.
 - Action wrapper aborted on repositories with no findings because the runner starts composite shell steps with `errexit`; it now disables it explicitly.
@@ -33,6 +38,9 @@ All notable changes to this project are documented here. The format follows [Kee
 - `verify/01-pwn-request/verify.sh live` called an undefined `die` function on a usage error; it now prints usage and exits 2.
 
 ### Changed
+- CI now also byte-compiles every Python helper and runs `tests/check_links.py`, an offline check that fails on dead relative links and heading anchors in any Markdown file.
+- README scenario table links rows 07–10 like the rest.
+- Action description now reflects all 14 scanner classes.
 - CI ShellCheck job now also lints `attacks/*/simulate.sh`, so the attack simulations are held to the same standard as the scanners and verifiers.
 - Attack driver now commits as the maintainer's current identity; author email in captured scenario 01 evidence redacted.
 

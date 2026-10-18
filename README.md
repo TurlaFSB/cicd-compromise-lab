@@ -68,7 +68,7 @@ A workflow references third-party actions by mutable tags (`uses: org/action@v1`
 
 **Fix:** Pin every third-party action to a full 40-character commit SHA. Use Dependabot to receive automated PRs when upstream publishes new versions. Set `persist-credentials: false` on checkout steps. Apply per-job least-privilege permissions and environment protection on deploy jobs.
 
-**Verification:** 12/12 structural checks pass. Detection scanner correctly flags all 11 mutable references in the vulnerable workflow and clears the hardened one.
+**Verification:** 13/13 structural checks pass. Detection scanner correctly flags all 11 mutable references in the vulnerable workflow and clears the hardened one.
 
 ### Scenario 05 — Cache poisoning
 
@@ -84,7 +84,7 @@ A build job uploads `dist/` and a publish job downloads and ships it — with no
 
 **Fix:** `actions/attest-build-provenance` signs a SLSA build-provenance attestation over the artifact in the build job; the publish job runs `gh attestation verify` (plus a SHA-256 re-check) before publishing, so a tampered byte fails verification and is never shipped. A tamper simulation (`attacks/06-artifact-tampering/simulate.sh`) demonstrates the mechanism and proves the vulnerable workflow is tamperable and the hardened one is not.
 
-**Verification:** 10/10 structural checks pass. Scanner catches the unverified-publish and no-provenance vectors on the vulnerable workflow and clears the hardened one; simulation reports TAMPERABLE vs. SAFE.
+**Verification:** 11/11 structural checks pass. Scanner catches the unverified-publish and no-provenance vectors on the vulnerable workflow and clears the hardened one; simulation reports TAMPERABLE vs. SAFE.
 
 ### Scenario 07 — Self-hosted runner persistence
 

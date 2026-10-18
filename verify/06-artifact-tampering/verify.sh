@@ -62,6 +62,31 @@ verify_static() {
   fi
   rm -rf "$tmp"
 
+  # --- Check 2b: regression — ordinary CI artifacts are not tamper targets ---
+  echo "--- Check 2b: scanner ignores test/coverage artifacts in plain CI ---"
+  tmp=$(mktemp -d); mkdir -p "$tmp/.github/workflows"
+  cat > "$tmp/.github/workflows/ci.yml" <<'YAML'
+name: ci
+on:
+  push:
+    branches: [main]
+  pull_request:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/upload-artifact@v4
+        with:
+          name: coverage
+          path: coverage/lcov.info
+YAML
+  if ("$DETECT" static "$tmp" 2>/dev/null || true) | grep -q "NO PROVENANCE"; then
+    assert_fail "scanner flagged a coverage artifact in a non-release workflow"
+  else
+    assert_pass "scanner does not flag coverage artifacts in non-release CI"
+  fi
+  rm -rf "$tmp"
+
   # --- Check 3: simulation TAMPERABLE on vulnerable, SAFE on hardened ---
   echo "--- Check 3: tamper simulation ---"
   if "$SIMULATE" "$VULN_WF" >/dev/null 2>&1; then

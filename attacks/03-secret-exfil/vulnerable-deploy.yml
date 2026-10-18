@@ -1,0 +1,41 @@
+name: Deploy (VULNERABLE — secret exfiltration demo, scenario 03)
+
+# VULNERABILITIES (intentional):
+#   1. The deploy key is echoed straight into the build log.
+#   2. The key is base64-encoded before printing, which defeats log masking
+#      (GitHub only masks the exact registered value).
+#   3. The secret sits in workflow-level env:, so every job and every step
+#      (including third-party actions) can read it.
+#   4. contents: write is granted workflow-wide although nothing needs it.
+#   5. The deploy job reads the secret with no protected environment.
+#
+# Tracked in TurlaFSB/cicd-compromise-lab, scenario 03. Do not copy this
+# pattern into a real project — see hardened/03-secret-exfil/ for the fix.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: write
+
+env:
+  DEPLOY_KEY: ${{ secrets.DUMMY_DEPLOY_KEY }}
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build
+        run: echo "building"
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy
+        run: |
+          echo "Deploying with key: $DEPLOY_KEY"
+          echo "Key (b64): $(echo "$DEPLOY_KEY" | base64)"

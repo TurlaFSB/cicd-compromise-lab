@@ -70,7 +70,7 @@ Each scenario below becomes its own folder under `attacks/`, `hardened/`, and `d
 
 ### 04 — Mutable action tag hijack ✅
 
-**Status:** Complete — detection operational (5 vectors), hardened workflow verified (12/12 checks pass).
+**Status:** Complete — detection operational (5 vectors), hardened workflow verified (13/13 checks pass).
 
 **Technique:** a workflow references a third-party action by a mutable tag (`uses: org/action@v1`); if that tag is retagged upstream (compromise or malicious maintainer), the workflow silently runs new code next run. Five mutable reference types detected: version tags, branch refs, special tags, short SHAs, and missing refs.
 **OWASP:** CICD-SEC-3 (Dependency Chain Abuse) · **ATT&CK:** T1195.001 (Compromise Software Dependencies and Development Tools)
@@ -87,7 +87,7 @@ Each scenario below becomes its own folder under `attacks/`, `hardened/`, and `d
 
 ### 06 — Artifact tampering ✅
 
-**Status:** Complete — detection operational (3 vectors + tamper simulation), hardened workflow verified (10/10 checks pass).
+**Status:** Complete — detection operational (3 vectors + tamper simulation), hardened workflow verified (11/11 checks pass).
 
 **Technique:** an artifact produced by the build job is modified before the release job consumes and publishes it, since `actions/upload-artifact`/`download-artifact` carry no integrity guarantee by default. Nothing binds the build output to the published bytes.
 **OWASP:** CICD-SEC-9 (Improper Artifact Integrity Validation) · **ATT&CK:** T1195 (Supply Chain Compromise)

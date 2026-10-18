@@ -2,12 +2,13 @@
 
 ## What is verified
 
-10 checks prove the hardened workflow binds build output to what is published:
+11 checks prove the hardened workflow binds build output to what is published:
 
 | # | Check | What it proves |
 |---|---|---|
 | 1 | Scanner vs. hardened workflow | Zero findings on the hardened workflow |
 | 2 | Scanner vs. vulnerable workflow | Scanner flags the vulnerable workflow |
+| 2b | Scanner false-positive regression | A coverage artifact in plain CI (no release trigger, no publish) is not flagged NO PROVENANCE |
 | 3a | Simulation vs. vulnerable | Reports TAMPERABLE (no integrity binding) |
 | 3b | Simulation vs. hardened | Reports SAFE (attested and verified) |
 | 4a | Build attestation | Build job uses `actions/attest-build-provenance` |

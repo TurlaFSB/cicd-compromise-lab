@@ -48,7 +48,7 @@ Finds all `pull_request_target` runs in the given time window, fetches each run'
 
 ```bash
 # Static: scan the vulnerable target repo
-./detect.sh static /home/claude/pwn-request-target
+./detect.sh static ~/pwn-request-target
 # Expected: FINDING on ci.yml
 
 # Static: scan the hardened version

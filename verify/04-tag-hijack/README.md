@@ -2,12 +2,13 @@
 
 ## What is verified
 
-The verification script proves that the hardened workflow eliminates the mutable action tag hijack attack surface through 12 structural checks:
+The verification script proves that the hardened workflow eliminates the mutable action tag hijack attack surface through 13 structural checks:
 
 | # | Check | What it proves |
 |---|---|---|
 | 1 | Scanner vs. hardened workflow | Detection scanner reports zero findings |
 | 2 | Scanner vs. vulnerable workflow | Detection scanner correctly identifies all 11 mutable tag references |
+| 2b | Scanner false-positive regression | `statuses: read` and expression-built local paths are not reported as action refs |
 | 3a | SHA pinning completeness | Every `uses:` line contains a full 40-character commit SHA |
 | 3b | No version tags | No `@vN` references remain in any `uses:` line |
 | 3c | No branch refs | No `@main`, `@master`, or `@develop` references |
@@ -27,7 +28,7 @@ The verification script proves that the hardened workflow eliminates the mutable
 ./verify.sh static
 ```
 
-This is the default mode and runs all 12 checks against the hardened workflow file and the detection scanner.
+This is the default mode and runs all 13 checks against the hardened workflow file and the detection scanner.
 
 ### Live verification (requires target repos)
 

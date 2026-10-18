@@ -33,7 +33,7 @@ jobs:
           shellcheck lab detections/*/detect.sh verify/*/verify.sh attacks/*/simulate.sh
 
       - name: Byte-compile Python helpers
-        run: python3 -m py_compile detections/to_sarif.py
+        run: python3 -m py_compile detections/to_sarif.py detections/*/*.py tests/check_links.py
 
   verify:
     name: Verify scenarios
@@ -46,6 +46,9 @@ jobs:
 
       - name: Run all verification suites
         run: ./lab verify
+
+      - name: Check markdown links and anchors
+        run: python3 tests/check_links.py
 
   scan-self:
     name: Scan own workflows

@@ -28,7 +28,7 @@ Runs entirely offline. Checks:
 ### Live verification
 
 ```bash
-./verify.sh live turla-lab-targets/pwn-request-target /home/claude/pwn-request-target
+./verify.sh live turla-lab-targets/pwn-request-target ~/pwn-request-target
 ```
 
 Prints manual steps to deploy the hardened workflow and re-run the attack. Expected outcome: the malicious payload runs in the `test` job but both of its assertions fail (no write token, no secret access), and the `label` job never touches PR code at all.

@@ -31,7 +31,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 LAB_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 DETECT="$LAB_ROOT/detections/01-pwn-request/detect.sh"
 HARDENED_WF="$LAB_ROOT/hardened/01-pwn-request/ci.yml"
-VULNERABLE_WF="" # set below if a target clone is available
+
 
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -71,24 +71,22 @@ verify_static() {
   # --- Check 2: detection scanner SHOULD fire on the vulnerable workflow ---
   echo ""
   echo "--- Check 2: detection scanner vs. vulnerable workflow ---"
-  if [ -n "${VULNERABLE_WF:-}" ] && [ -d "$VULNERABLE_WF" ]; then
-    if ("$DETECT" static "$VULNERABLE_WF" 2>/dev/null || true) | grep -q "FINDING"; then
+  # The vulnerable workflow ships in this repo, so this check runs everywhere
+  # (including CI) instead of depending on a local clone of the target repo.
+  local vuln_wf="$LAB_ROOT/attacks/01-pwn-request/vulnerable-ci.yml"
+  if [ -f "$vuln_wf" ]; then
+    local vuln_repo
+    vuln_repo="$(mktemp -d)"
+    mkdir -p "$vuln_repo/.github/workflows"
+    cp "$vuln_wf" "$vuln_repo/.github/workflows/"
+    if ("$DETECT" static "$vuln_repo" 2>/dev/null || true) | grep -q "FINDING"; then
       assert_pass "detection scanner correctly flags the vulnerable workflow"
     else
       assert_fail "detection scanner missed the vulnerable workflow"
     fi
+    rm -rf "$vuln_repo"
   else
-    # Try the default target clone location
-    local target_clone="/home/claude/pwn-request-target"
-    if [ -d "$target_clone/.github/workflows" ]; then
-      if ("$DETECT" static "$target_clone" 2>/dev/null || true) | grep -q "FINDING"; then
-        assert_pass "detection scanner correctly flags the vulnerable workflow"
-      else
-        assert_fail "detection scanner missed the vulnerable workflow"
-      fi
-    else
-      echo "  SKIP: vulnerable target repo not found at $target_clone — cannot cross-check."
-    fi
+    assert_fail "vulnerable workflow fixture missing: attacks/01-pwn-request/vulnerable-ci.yml"
   fi
 
   # --- Check 3: structural invariants of the hardened workflow ---
@@ -171,7 +169,6 @@ verify_static() {
 
 verify_live() {
   local target_repo="$1"
-  local target_clone="$2"
 
   echo "=== Live verification: re-attack against hardened workflow ==="
   echo ""

@@ -84,6 +84,33 @@ verify_static() {
     echo "  SKIP: vulnerable workflow not found at $VULNERABLE_WF"
   fi
 
+  # --- Check 2b: regression — keys that merely end in "uses" are not action refs ---
+  # 'statuses: read' used to be parsed as 'uses: read' and reported as NO REF;
+  # expression-built local paths ('uses: $...') are not remote refs either.
+  echo ""
+  echo "--- Check 2b: scanner ignores non-action keys and local paths ---"
+  local fp_repo
+  fp_repo=$(mktemp -d)
+  mkdir -p "$fp_repo/.github/workflows"
+  cat > "$fp_repo/.github/workflows/ci.yml" <<'YAML'
+name: fp
+on: push
+permissions:
+  contents: read
+  statuses: read
+jobs:
+  a:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: $/.github/actions/local
+YAML
+  if ("$DETECT" static "$fp_repo" 2>/dev/null || true) | grep -q "FINDING"; then
+    assert_fail "scanner reported a false positive on 'statuses: read' / local path"
+  else
+    assert_pass "scanner ignores 'statuses: read' and expression-built local paths"
+  fi
+  rm -rf "$fp_repo"
+
   # --- Check 3: structural invariants of the hardened workflow ---
   echo ""
   echo "--- Check 3: structural invariants ---"

@@ -1,0 +1,54 @@
+name: CI (VULNERABLE — pwn request demo, scenario 01)
+
+# VULNERABILITY: pull_request_target runs with the base repo's permissions
+# and secrets even for PRs from forks, but this workflow checks out the
+# PR's own head commit and then executes it (npm ci / npm test run
+# whatever is in the PR). That lets any external contributor's PR run
+# arbitrary code with this token's and these secrets' access.
+#
+# This is intentional. Tracked in TurlaFSB/cicd-compromise-lab,
+# scenario 01. Do not copy this pattern into a real project — see
+# hardened/01-pwn-request/ci.yml in that repo for the fix.
+
+on:
+  pull_request_target:
+    branches: [main]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout PR head (VULNERABLE — attacker-controlled code)
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install dependencies
+        run: npm ci || npm install
+
+      - name: Run tests
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          DUMMY_CLOUD_KEY: ${{ secrets.DUMMY_CLOUD_KEY }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: npm test
+
+      # Evidence capture for the cicd-compromise-lab write-up. Not part of
+      # the vulnerability itself — this just lets us pull proof out of the
+      # run instead of eyeballing logs.
+      - name: Upload evidence (if any)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: evidence-${{ github.run_id }}
+          path: evidence/
+          if-no-files-found: ignore

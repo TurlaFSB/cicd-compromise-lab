@@ -7,7 +7,7 @@
 | Condition | Meaning |
 |---|---|
 | download + publish, no verify | An artifact is downloaded and published with no attestation/signature/checksum verification between |
-| upload, no provenance | An artifact is uploaded with no attestation, signature, or checksum |
+| upload, no provenance | A release or publishing workflow uploads an artifact with no attestation, signature, or checksum (plain CI test/coverage artifacts are ignored) |
 | `workflow_run` + download | A privileged `workflow_run` job consumes artifacts from another (possibly untrusted) run |
 
 ## Scanner
@@ -17,7 +17,7 @@
 | Vector | What it catches |
 |---|---|
 | UNVERIFIED PUBLISH | `download-artifact` (or `gh run download`) → publish (`npm publish`, `gh release`, `docker push`, …) with no `gh attestation verify` / `cosign verify` / `sha256sum --check` in between |
-| NO PROVENANCE | `upload-artifact` with no `attest-build-provenance`, `cosign sign`, or generated checksum |
+| NO PROVENANCE | `upload-artifact` in a release/publish workflow (tag or release trigger, or a publish step) with no `attest-build-provenance`, `cosign sign`, or generated checksum |
 | CROSS-WORKFLOW CONSUMPTION | a `workflow_run`-triggered workflow that downloads artifacts |
 
 ### Usage

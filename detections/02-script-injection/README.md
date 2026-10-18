@@ -60,7 +60,7 @@ Fetches all active workflow definitions from the repository and checks each one 
 
 ```bash
 # Static: scan the vulnerable target repo
-./detect.sh static /home/claude/script-injection-target
+./detect.sh static ~/script-injection-target
 # Expected: FINDING on triage.yml — github.event.issue.title in run: step
 
 # Static: scan the hardened version

@@ -1,0 +1,40 @@
+name: Issue triage (VULNERABLE — script injection demo, scenario 02)
+
+# VULNERABILITY: this workflow interpolates github.event.issue.title
+# directly into a run: shell step via ${{ }} template expansion. GitHub
+# Actions performs this expansion as a literal string substitution BEFORE
+# the shell ever sees the line — so an issue title containing shell
+# metacharacters (backticks, $(), ;, &&) is not treated as data, it
+# becomes part of the script itself.
+#
+# This is intentional. Tracked in TurlaFSB/cicd-compromise-lab,
+# scenario 02. Do not copy this pattern into a real project — see
+# hardened/02-script-injection/triage.yml in that repo for the fix.
+
+on:
+  issues:
+    types: [opened]
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  triage:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Greet the issue author (VULNERABLE — unsanitized title in run:)
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          DUMMY_CLOUD_KEY: ${{ secrets.DUMMY_CLOUD_KEY1 }}
+        run: |
+          echo "Thanks for opening: ${{ github.event.issue.title }}"
+          echo "Triage complete."
+
+      - name: Upload evidence (if any)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: evidence-${{ github.run_id }}
+          path: evidence/
+          if-no-files-found: ignore
