@@ -29,10 +29,10 @@ CI/CD pipelines hold secrets, publish artifacts, and deploy to production — ma
 | 04 | [Mutable action tag hijack](#scenario-04--mutable-action-tag-hijack) | CICD-SEC-3 | T1195.001 | Complete |
 | 05 | [Cache poisoning](#scenario-05--cache-poisoning) | CICD-SEC-9 | T1195.002 | Complete |
 | 06 | [Artifact tampering](#scenario-06--artifact-tampering) | CICD-SEC-9 | T1195 | Complete |
-| 07 | Self-hosted runner persistence | CICD-SEC-7 | T1053, T1547 | Complete |
-| 08 | `GITHUB_ENV` / `GITHUB_PATH` injection | CICD-SEC-4 | T1574 | Complete |
-| 09 | Reusable workflow trust boundary | CICD-SEC-3, CICD-SEC-4 | T1195.001 | Complete |
-| 10 | `GITHUB_TOKEN` over-privilege | CICD-SEC-5, CICD-SEC-2 | T1078.004 | Complete |
+| 07 | [Self-hosted runner persistence](#scenario-07--self-hosted-runner-persistence) | CICD-SEC-7 | T1053, T1547 | Complete |
+| 08 | [`GITHUB_ENV` / `GITHUB_PATH` injection](#scenario-08--github_env--github_path-injection) | CICD-SEC-4 | T1574 | Complete |
+| 09 | [Reusable workflow trust boundary](#scenario-09--reusable-workflow-trust-boundary) | CICD-SEC-3, CICD-SEC-4 | T1195.001 | Complete |
+| 10 | [`GITHUB_TOKEN` over-privilege](#scenario-10--github_token-over-privilege) | CICD-SEC-5, CICD-SEC-2 | T1078.004 | Complete |
 | 11 | [`workflow_run` artifact poisoning](#scenario-11--workflow_run-artifact-poisoning) | CICD-SEC-4 | T1195 | Complete |
 | 12 | [OIDC trust policy misconfiguration](#scenario-12--oidc-trust-policy-misconfiguration) | CICD-SEC-2, CICD-SEC-5 | T1078.004 | Complete |
 | 13 | [Credential leakage via artifacts](#scenario-13--credential-leakage-via-artifacts) | CICD-SEC-6 | T1552.001 | Complete |
