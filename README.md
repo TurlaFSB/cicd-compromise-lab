@@ -35,7 +35,7 @@ CI/CD pipelines hold secrets, publish artifacts, and deploy to production — ma
 | 10 | `GITHUB_TOKEN` over-privilege | CICD-SEC-5, CICD-SEC-2 | T1078.004 | Complete |
 | 11 | [`workflow_run` artifact poisoning](#scenario-11--workflow_run-artifact-poisoning) | CICD-SEC-4 | T1195 | Complete |
 | 12 | [OIDC trust policy misconfiguration](#scenario-12--oidc-trust-policy-misconfiguration) | CICD-SEC-2, CICD-SEC-5 | T1078.004 | Complete |
-| 13 | Credential leakage via artifacts | CICD-SEC-6 | T1552.001 | Planned |
+| 13 | [Credential leakage via artifacts](#scenario-13--credential-leakage-via-artifacts) | CICD-SEC-6 | T1552.001 | Complete |
 | 14 | Dependency confusion and install-script abuse | CICD-SEC-3 | T1195.001 | Planned |
 
 ### Scenario 01 — Pwn request
@@ -134,6 +134,14 @@ OIDC replaces long-lived cloud keys with a short-lived GitHub-signed token; the 
 
 **Verification:** 14/14 checks pass. Five-vector scanner spanning the cloud policy (wildcard subject, missing subject, missing audience) and the workflow (workflow-level id-token, id-token on an untrusted trigger); trust-policy JSON parsed by `policy.py`.
 
+### Scenario 13 — credential leakage via artifacts
+
+A build job leaks secrets into the artifact it uploads: `actions/checkout` persists its token into `.git/config`, the npm token is written to `.npmrc`, and the upload uses `path: .` with `include-hidden-files: true`. Anyone who downloads the artifact — anyone on the internet, for a public repo — extracts both tokens.
+
+**Fix:** `persist-credentials: false` so the token never lands in `.git/config`; pass secrets through `env:` to the tool that needs them (`NODE_AUTH_TOKEN` for `npm publish`) instead of writing them to disk; upload only the build output (`path: dist/`); leave `include-hidden-files` at its safe default. A simulation (`attacks/13-artifact-cred-leak/simulate.sh`) archives a workspace both ways and greps the artifact for the secret.
+
+**Verification:** 14/14 checks pass. Four-vector step-aware scanner (persisted checkout credential, secret written to file, broad upload path, hidden files in artifact) over `leak.awk`.
+
 ## Architecture
 
 Every scenario repeats the same four-folder layout, so the tree below shows
@@ -164,7 +172,7 @@ cicd-compromise-lab/
 │              04-tag-hijack   05-cache-poisoning   06-artifact-tampering
 │              07-runner-persistence   08-env-injection   09-reusable-workflow
 │              10-token-overprivilege   11-workflow-run-poisoning
-│              12-oidc-trust-policy   (13+ planned)
+│              12-oidc-trust-policy   13-artifact-cred-leak   (14 planned)
 │
 ├── docs/threat-model.md         ← system under test, trust boundaries, scenario catalog
 ├── tests/fixtures/              ← known-vulnerable workflow used by the action self-test
@@ -335,7 +343,8 @@ Each scenario has its own documentation at four levels of detail:
 - [x] Unified scanner (`lab scan`) across all scenarios, with SARIF output for GitHub code scanning
 - [x] Scenario 11 — `workflow_run` artifact poisoning
 - [x] Scenario 12 — OIDC trust policy misconfiguration
-- [ ] Scenarios 13–14 — artifact credential leakage, dependency confusion
+- [x] Scenario 13 — credential leakage via artifacts
+- [ ] Scenario 14 — dependency confusion and install-script abuse
 - [ ] Empirical scan of public repositories and comparison against `zizmor` and `actionlint`
 - [ ] Jenkins phase 2 (separate top-level folder or repo)
 

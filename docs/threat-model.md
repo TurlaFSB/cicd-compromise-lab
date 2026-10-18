@@ -148,6 +148,15 @@ Each scenario below becomes its own folder under `attacks/`, `hardened/`, and `d
 **Impact:** an unintended or fork-controlled run assumes a cloud role and acts in the account with no stored secret to steal.
 **Fix:** `StringEquals` on both `sub` (one repo + ref, or a protected environment) and `aud`; `id-token: write` per job under a read-only floor; deploy only from trusted triggers. See `hardened/12-oidc-trust-policy/`.
 
+### 13 — credential leakage via artifacts ✅
+
+**Status:** Complete — detection operational (4 vectors + leak simulation), hardened workflow verified (14/14 checks pass).
+
+**Technique:** a build job leaks secrets into an uploaded artifact — a persisted checkout token in `.git/config`, a secret written to a file, a broad upload path, or `include-hidden-files: true`. Anyone who can download the artifact (anyone, for a public repo) extracts the credential.
+**OWASP:** CICD-SEC-6 (Insufficient Credential Hygiene) · **ATT&CK:** T1552.001 (Unsecured Credentials: Credentials In Files)
+**Impact:** long-lived tokens (npm, cloud, deploy keys) and the checkout token exposed to anyone with artifact access.
+**Fix:** `persist-credentials: false`, secrets via `env:` not disk, upload only build output, no forced hidden files. See `hardened/13-artifact-cred-leak/`.
+
 ## Detection strategy
 
 Each scenario gets a corresponding detection in `detections/`, expressed as:

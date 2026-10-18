@@ -1,0 +1,43 @@
+title: GitHub Actions Credential Leakage via Uploaded Artifacts
+id: 9c2a7e40-5d16-4b83-b0f1-6a3e8d7c21b9
+status: experimental
+description: |
+  Detects workflows that can leak a credential inside an uploaded artifact,
+  where anyone able to download the artifact obtains the secret. Four patterns:
+  actions/checkout left with persisted credentials (the token lands in
+  .git/config) in a job that uploads an artifact; a secret written to a file on
+  disk; an upload-artifact path that captures the whole tree; and
+  include-hidden-files: true, which re-enables capture of .git, .env and .npmrc.
+
+  This rule fires on the workflow definition (YAML), not on runtime log events.
+references:
+  - https://owasp.org/www-project-top-10-ci-cd-security-risks/CICD-SEC-06-Insufficient-Credential-Hygiene
+  - https://docs.github.com/en/actions/security-for-github-actions/security-guides/security-hardening-for-github-actions
+  - https://github.com/actions/checkout#usage
+  - https://github.com/actions/upload-artifact#hidden-files
+author: TurlaFSB
+date: 2026-10-18
+tags:
+  - attack.t1552.001
+  - attack.credential_access
+  - cicd_sec_6
+logsource:
+  category: ci_cd
+  product: github_actions
+  service: workflow_definition
+detection:
+  uploads_artifact:
+    step|re: 'uses:\s*actions/upload-artifact'
+  secret_to_file:
+    run|re: '\$\{\{\s*secrets\.[A-Za-z0-9_]+\s*\}\}[^\n]*(>>?|\btee\b)'
+  broad_path:
+    step|re: 'path:\s*["'']?(\.|\*\*?)\s*$'
+  hidden_files:
+    step|re: 'include-hidden-files:\s*true'
+  condition: secret_to_file or (uploads_artifact and (broad_path or hidden_files))
+falsepositives:
+  - Uploading a specific build directory (path: dist/) with no secret on disk
+    and persist-credentials: false is safe and should not match.
+  - A secret redirected into a $GITHUB_ENV / $GITHUB_OUTPUT runner file is a
+    different concern (environment handling) and is excluded here.
+level: high

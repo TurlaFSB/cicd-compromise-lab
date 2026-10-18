@@ -1,0 +1,54 @@
+# hardened/13-artifact-cred-leak/release.yml  —  HARDENED
+#
+# Scenario 13 — credential leakage via artifacts, fixed. Each of the four leaks
+# is closed:
+#
+#   1. persist-credentials: false — the checkout token is never written to
+#      .git/config, so it cannot ride along in anything that archives the tree.
+#   2. The npm token is never written to a file. setup-node writes an .npmrc
+#      that references the token through the NODE_AUTH_TOKEN environment
+#      variable at publish time; the literal secret never lands on disk.
+#   3. The upload path is dist/ — only the build output, no dotfiles, no tree.
+#   4. include-hidden-files is left at its safe default (false).
+#
+# Every credential here is a dummy lab value.
+
+name: Build and release
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+
+      # registry-url makes setup-node write an .npmrc that reads the token from
+      # NODE_AUTH_TOKEN at runtime — the secret itself is never written out.
+      - uses: actions/setup-node@39370e3970a6d050c480ffad4ff0ed4d3fdee5af # v4.1.0
+        with:
+          node-version: "20"
+          registry-url: "https://registry.npmjs.org"
+
+      - name: Build
+        run: |
+          npm ci
+          npm run build
+
+      - name: Publish
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: npm publish
+
+      # Only the build output is uploaded; nothing hidden, no tree, no secret.
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: build-output
+          path: dist/

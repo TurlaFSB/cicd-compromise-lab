@@ -82,6 +82,10 @@ SCENARIOS = {
         "OIDC trust policy misconfiguration",
         "https://owasp.org/www-project-top-10-ci-cd-security-risks/CICD-SEC-05-Insufficient-PBAC",
     ),
+    "13-artifact-cred-leak": (
+        "Credential leakage via artifacts",
+        "https://owasp.org/www-project-top-10-ci-cd-security-risks/CICD-SEC-06-Insufficient-Credential-Hygiene",
+    ),
 }
 
 # Matches "<file>" or "<file>:<line>" then ": <message>".

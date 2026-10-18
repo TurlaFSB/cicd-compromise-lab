@@ -1,0 +1,56 @@
+# attacks/13-artifact-cred-leak/release.yml  —  VULNERABLE
+#
+# Scenario 13 — credential leakage via artifacts (CICD-SEC-6, MITRE T1552.001).
+#
+# This build job leaks secrets four different ways, all ending in the same
+# place: an uploaded artifact that anyone able to download it can read. On a
+# public repo, artifacts are downloadable by anyone; on a private repo, by
+# everyone with read access (and by any workflow that can reach the run).
+#
+#   1. actions/checkout keeps the job's token in .git/config (the default
+#      persist-credentials: true).
+#   2. The npm token is written to a real file (.npmrc) on disk.
+#   3. The artifact upload path is '.', so it sweeps the whole tree —
+#      including .git/config and .npmrc.
+#   4. include-hidden-files: true forces even dotfiles into the artifact.
+#
+# Anyone who downloads the "build-output" artifact gets the checkout token and
+# the npm token. Every credential here is a dummy lab value.
+
+name: Build and release
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      # persist-credentials defaults to true → token written to .git/config.
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+
+      - uses: actions/setup-node@39370e3970a6d050c480ffad4ff0ed4d3fdee5af # v4.1.0
+        with:
+          node-version: "20"
+
+      # Secret materialised on disk, in the working tree.
+      - name: Write npm auth
+        run: |
+          echo "//registry.npmjs.org/:_authToken=${{ secrets.NPM_TOKEN }}" > .npmrc
+
+      - name: Build
+        run: |
+          npm ci
+          npm run build
+
+      # Broad path + hidden files: the artifact now contains .git/config (token)
+      # and .npmrc (npm token) alongside the build output.
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: build-output
+          path: .
+          include-hidden-files: true
