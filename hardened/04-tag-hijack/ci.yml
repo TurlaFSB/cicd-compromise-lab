@@ -109,7 +109,7 @@ jobs:
       # In production, use `dependabot.yml` with `ecosystem: github-actions`
       # to receive automated PRs when upstream publishes a new version.
       - name: Deploy to staging
-        uses: turla-lab-targets/lab-helper-action@a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0 # v1.0.0 (lab fixture)
+        uses: turla-lab-targets/lab-helper-action@8e5c15735dd46afe693d0164f4ba2b802ade690b # v1.0.0 (lab fixture)
         with:
           target: staging
           token: ${{ secrets.DEPLOY_TOKEN }}
