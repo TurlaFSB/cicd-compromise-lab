@@ -1,0 +1,44 @@
+# attacks/11-workflow-run-poisoning/build.yml  —  VULNERABLE (producer)
+#
+# The untrusted half of the artifact-poisoning pair. It runs on `pull_request`,
+# so it executes for pull requests opened from forks — code the base repo has
+# not reviewed. By design this job is low-privilege: the fork's token is
+# read-only and no secrets are exposed here. That is exactly why attackers do
+# not attack this job directly. Instead they use it as a *delivery vehicle*:
+# whatever this job uploads as an artifact is fully attacker-controlled, and
+# the privileged `comment.yml` workflow will later pick that artifact up and
+# trust it.
+#
+# The artifact this uploads ("pr-build") contains the whole checked-out tree,
+# including any scripts the fork added. See comment.yml for where it goes wrong.
+
+name: PR build
+
+on:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+
+      - uses: actions/setup-node@39370e3970a6d050c480ffad4ff0ed4d3fdee5af # v4.1.0
+        with:
+          node-version: "20"
+
+      - name: Build
+        run: |
+          npm ci --ignore-scripts
+          npm run build --if-present
+
+      # Uploads the ENTIRE working tree as the artifact, including anything the
+      # fork added under scripts/. A privileged downstream workflow treats this
+      # as trusted build output — it is not.
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: pr-build
+          path: .

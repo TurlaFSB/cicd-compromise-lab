@@ -30,7 +30,7 @@ jobs:
       - name: Lint shell scripts
         run: |
           shopt -s nullglob
-          shellcheck lab detections/*/detect.sh verify/*/verify.sh
+          shellcheck lab detections/*/detect.sh verify/*/verify.sh attacks/*/simulate.sh
 
       - name: Byte-compile Python helpers
         run: python3 -m py_compile detections/to_sarif.py

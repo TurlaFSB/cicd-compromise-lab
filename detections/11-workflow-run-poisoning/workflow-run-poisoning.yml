@@ -1,0 +1,51 @@
+title: GitHub Actions workflow_run Artifact Poisoning / Privileged Fork Output Consumption
+id: 7f1c3d84-2a69-4b0e-9d5a-1e8c6b4f2a37
+status: experimental
+description: |
+  Detects workflow_run-triggered workflows that consume output from the
+  triggering run unsafely. A workflow_run handler executes in the base
+  repository's context — its secrets and a read/write token — even when the
+  run that triggered it originated from a fork pull request. The fork controls
+  everything that run produced: its uploaded artifacts, its head branch name,
+  its commit title. A handler that checks out that head, runs code from the
+  downloaded artifact, or splices workflow_run context into a shell gives a
+  fork-PR author code execution with the base repo's privileges — the
+  artifact-poisoning variant of a pwn request.
+
+  This rule fires on the workflow definition (YAML), not on runtime log events.
+references:
+  - https://owasp.org/www-project-top-10-ci-cd-security-risks/CICD-SEC-04-Poisoned-Pipeline-Execution
+  - https://securitylab.github.com/research/github-actions-preventing-pwn-requests/
+  - https://docs.github.com/en/actions/writing-workflows/choosing-when-your-workflow-runs/events-that-trigger-workflows#workflow_run
+  - https://docs.github.com/en/actions/writing-workflows/choosing-what-your-workflow-does/accessing-contextual-information-about-workflow-runs
+author: TurlaFSB
+date: 2026-10-18
+tags:
+  - attack.t1195
+  - attack.supply_chain_compromise
+  - attack.execution
+  - cicd_sec_4
+logsource:
+  category: ci_cd
+  product: github_actions
+  service: workflow_definition
+detection:
+  is_workflow_run:
+    trigger|re: '^\s*workflow_run:\s*$'
+  checkout_head:
+    step|re: 'ref:\s*\$\{\{[^}]*github\.event\.workflow_run\.(head_branch|head_sha|head_repository)'
+  download_from_run:
+    step|re: 'run-id:\s*\$\{\{[^}]*github\.event\.workflow_run\.id|listWorkflowRunArtifacts|downloadArtifact|dawidd6/action-download-artifact'
+  executes_code:
+    run|re: '(^|[^[:alnum:]_])(node|python3?|bash|sh)\s+[./]|npm\s+(ci|install|run)|(^|\s)(source|\.)\s+[./]'
+  untrusted_context_in_run:
+    run|re: '\$\{\{[^}]*github\.event\.workflow_run\.(head_branch|display_title|head_repository|head_commit|name)'
+  condition: is_workflow_run and (checkout_head or untrusted_context_in_run or (download_from_run and executes_code))
+falsepositives:
+  - A workflow_run handler that downloads an artifact and treats it strictly as
+    data (reads and validates it, never executes it) is safe; this rule
+    requires a head checkout, artifact/code execution, or untrusted context in
+    a shell, not the download alone.
+  - Reading immutable workflow_run fields (id, head_sha, conclusion, event)
+    for control flow is safe and does not match the untrusted_context pattern.
+level: high

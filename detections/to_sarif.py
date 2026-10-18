@@ -74,12 +74,18 @@ SCENARIOS = {
         "GITHUB_TOKEN over-privilege",
         "https://owasp.org/www-project-top-10-ci-cd-security-risks/CICD-SEC-05-Insufficient-PBAC",
     ),
+    "11-workflow-run-poisoning": (
+        "workflow_run artifact poisoning",
+        "https://owasp.org/www-project-top-10-ci-cd-security-risks/CICD-SEC-04-Poisoned-Pipeline-Execution",
+    ),
 }
 
 # Matches "<file>" or "<file>:<line>" then ": <message>".
 BODY_RE = re.compile(r"^(?P<file>[\w.\-/]+?)(?::(?P<line>\d+))?: (?P<msg>.*)$")
 # A leading uppercase VECTOR phrase before an em dash, e.g. "MUTABLE TAG — ...".
-VECTOR_RE = re.compile(r"^(?P<vector>[A-Z][A-Z0-9 /\-]+?) — ")
+# Underscores are allowed so phrases naming workflow tokens (GITHUB_ENV,
+# WORKFLOW_RUN) stay a single vector rather than falling back to the scenario.
+VECTOR_RE = re.compile(r"^(?P<vector>[A-Z][A-Z0-9 /_\-]+?) — ")
 
 
 def slugify(text):

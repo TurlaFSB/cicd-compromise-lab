@@ -130,6 +130,15 @@ Each scenario below becomes its own folder under `attacks/`, `hardened/`, and `d
 **Impact:** amplifies every other compromise — a single hijacked step can push code, publish packages, delete caches, or mint OIDC tokens.
 **Fix:** read-only workflow-level floor, write scopes per job, no high-risk write on untrusted triggers, read-only repository default. See `hardened/10-token-overprivilege/`.
 
+### 11 — workflow_run artifact poisoning ✅
+
+**Status:** Complete — detection operational (3 vectors + poisoning simulation), hardened workflows verified (11/11 checks pass).
+
+**Technique:** a `workflow_run` handler runs in the base repo's context (secrets, read/write token) even when the run that triggered it came from a fork PR. A handler that consumes the upstream run's output unsafely — checking out its head, executing its downloaded artifact, or splicing its branch name/title into a shell — gives a fork-PR author code execution with the base repo's privileges.
+**OWASP:** CICD-SEC-4 (Poisoned Pipeline Execution) · **ATT&CK:** T1195 (Supply Chain Compromise)
+**Impact:** full secret exposure and arbitrary privileged code execution from an unmerged fork pull request.
+**Fix:** upload only minimal, validated data (a PR number) from the producer; in the handler, never check out the head or execute the artifact, pass `workflow_run` context via `env:`, and keep a read-only floor with `pull-requests: write` only on the job. See `hardened/11-workflow-run-poisoning/`.
+
 ## Detection strategy
 
 Each scenario gets a corresponding detection in `detections/`, expressed as:

@@ -1,0 +1,43 @@
+# hardened/11-workflow-run-poisoning/build.yml  —  HARDENED (producer)
+#
+# The producer still runs on fork pull requests and is still low-privilege —
+# that part was never the problem. The fix is what it hands downstream: instead
+# of uploading the whole attacker-controlled tree as "pr-build", it uploads a
+# single, minimal, well-typed fact that the privileged consumer actually needs
+# — the PR number — and nothing executable.
+#
+# A fork can still write any number into that file, so the consumer must still
+# validate it (see comment.yml). But there is no longer a tree of fork scripts
+# riding along in the artifact for a downstream job to run.
+
+name: PR build
+
+on:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+
+      - uses: actions/setup-node@39370e3970a6d050c480ffad4ff0ed4d3fdee5af # v4.1.0
+        with:
+          node-version: "20"
+
+      - name: Build
+        run: |
+          npm ci --ignore-scripts
+          npm run build --if-present
+
+      # Emit ONLY the PR number, as data. No build tree, no scripts.
+      - name: Record PR number
+        run: echo "${{ github.event.number }}" > NR
+
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: pr-number
+          path: NR

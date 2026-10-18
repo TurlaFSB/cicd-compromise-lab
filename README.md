@@ -33,7 +33,7 @@ CI/CD pipelines hold secrets, publish artifacts, and deploy to production — ma
 | 08 | `GITHUB_ENV` / `GITHUB_PATH` injection | CICD-SEC-4 | T1574 | Complete |
 | 09 | Reusable workflow trust boundary | CICD-SEC-3, CICD-SEC-4 | T1195.001 | Complete |
 | 10 | `GITHUB_TOKEN` over-privilege | CICD-SEC-5, CICD-SEC-2 | T1078.004 | Complete |
-| 11 | `workflow_run` artifact poisoning | CICD-SEC-4 | T1195 | Planned |
+| 11 | [`workflow_run` artifact poisoning](#scenario-11--workflow_run-artifact-poisoning) | CICD-SEC-4 | T1195 | Complete |
 | 12 | OIDC trust policy misconfiguration | CICD-SEC-2, CICD-SEC-5 | T1078.004 | Planned |
 | 13 | Credential leakage via artifacts | CICD-SEC-6 | T1552.001 | Planned |
 | 14 | Dependency confusion and install-script abuse | CICD-SEC-3 | T1195.001 | Planned |
@@ -118,6 +118,14 @@ Three workflows hold a `GITHUB_TOKEN` far broader than their work needs: `permis
 
 **Verification:** 15/15 checks pass. Four-vector scanner (`write-all`, no block, workflow-level write, write on untrusted trigger) shares one permissions parser with the simulation.
 
+### Scenario 11 — workflow_run artifact poisoning
+
+A `pull_request` build uploads its whole tree as an artifact; a privileged `workflow_run` handler then downloads it, checks out the fork's head, and runs code from it with the base repo's token and secrets. A `workflow_run` handler always runs in the base repo context even when the run that triggered it came from a fork, so everything that run produced — artifacts, branch name, commit title — is attacker-controlled. This is the artifact-poisoning variant of a pwn request: the fork never touches the privileged job, it poisons what the job later consumes.
+
+**Fix:** have the producer upload the minimal data the consumer needs (a PR number), not the tree; in the handler, treat upstream output as untrusted data — never check out the head, never execute the artifact, validate the value (`[0-9]+`), and pass any `workflow_run` context through `env:` instead of `${{ }}` in a shell; keep a read-only floor and grant only `pull-requests: write` on the job. An offline simulation (`attacks/11-workflow-run-poisoning/simulate.sh`) executes a poisoned artifact in a blind consumer and shows a validating consumer stay safe.
+
+**Verification:** 11/11 checks pass. Three-vector scanner (untrusted context in `run:`, head checkout, poisoned-artifact execution) over a parser that separates the `workflow_run` trigger from the context object; artifact download alone is an informational note, not a finding.
+
 ## Architecture
 
 Every scenario repeats the same four-folder layout, so the tree below shows
@@ -147,7 +155,7 @@ cicd-compromise-lab/
 ├── scenarios: 01-pwn-request  02-script-injection  03-secret-exfil
 │              04-tag-hijack   05-cache-poisoning   06-artifact-tampering
 │              07-runner-persistence   08-env-injection   09-reusable-workflow
-│              10-token-overprivilege   (11+ planned)
+│              10-token-overprivilege   11-workflow-run-poisoning   (12+ planned)
 │
 ├── docs/threat-model.md         ← system under test, trust boundaries, scenario catalog
 ├── tests/fixtures/              ← known-vulnerable workflow used by the action self-test
@@ -316,7 +324,8 @@ Each scenario has its own documentation at four levels of detail:
 - [x] CI that runs every verification suite, `shellcheck`, and a self-scan on each push
 - [x] Reusable GitHub Action wrapper and `lab pin` auto-fix for unpinned actions
 - [x] Unified scanner (`lab scan`) across all scenarios, with SARIF output for GitHub code scanning
-- [ ] Scenarios 11–14 — `workflow_run` poisoning, OIDC misconfiguration, artifact credential leakage, dependency confusion
+- [x] Scenario 11 — `workflow_run` artifact poisoning
+- [ ] Scenarios 12–14 — OIDC misconfiguration, artifact credential leakage, dependency confusion
 - [ ] Empirical scan of public repositories and comparison against `zizmor` and `actionlint`
 - [ ] Jenkins phase 2 (separate top-level folder or repo)
 

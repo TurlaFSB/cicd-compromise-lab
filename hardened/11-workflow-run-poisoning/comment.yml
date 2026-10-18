@@ -1,0 +1,74 @@
+# hardened/11-workflow-run-poisoning/comment.yml  —  HARDENED (privileged consumer)
+#
+# Scenario 11 — workflow_run artifact poisoning, fixed.
+#
+# This workflow still runs on workflow_run with the privileges it needs to
+# comment on the PR. What changed is that it treats everything coming from the
+# upstream (fork-triggerable) run as untrusted DATA, never as code or trusted
+# input:
+#
+#   * It does NOT check out the fork's head branch.
+#   * It does NOT run anything out of the downloaded artifact.
+#   * It downloads only the minimal `pr-number` artifact and VALIDATES it is an
+#     integer before use — a poisoned value fails closed.
+#   * The one workflow_run context field it reads (`event`) is passed through
+#     env: and only compared, never spliced into a command.
+#   * Permissions follow least privilege: a read-only workflow floor, with the
+#     single write scope commenting needs granted on the job.
+#
+# Every credential here is a dummy lab value.
+
+name: PR comment
+
+on:
+  workflow_run:
+    workflows: ["PR build"]
+    types: [completed]
+
+# Read-only floor for the whole workflow.
+permissions:
+  contents: read
+
+jobs:
+  comment:
+    runs-on: ubuntu-latest
+    # Only react to a successful build that came from a pull request.
+    if: >
+      github.event.workflow_run.event == 'pull_request' &&
+      github.event.workflow_run.conclusion == 'success'
+    permissions:
+      pull-requests: write      # the only write scope this job needs
+    steps:
+      # Download only the minimal data artifact from the triggering run.
+      - name: Download PR number
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: pr-number
+          path: pr-number
+          run-id: ${{ github.event.workflow_run.id }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      # Treat the artifact bytes strictly as untrusted data. Read the number,
+      # validate it is a positive integer, and fail closed otherwise. Nothing
+      # from the artifact is ever executed.
+      - name: Validate PR number
+        id: pr
+        run: |
+          set -euo pipefail
+          num="$(tr -dc '0-9' < pr-number/NR | head -c 12)"
+          if [ -z "$num" ]; then
+            echo "artifact did not contain a valid PR number" >&2
+            exit 1
+          fi
+          echo "number=$num" >> "$GITHUB_OUTPUT"
+
+      # Comment using only the validated integer. The token is scoped to
+      # pull-requests: write; no secrets beyond GITHUB_TOKEN are in reach.
+      - name: Comment on the PR
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ steps.pr.outputs.number }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          gh pr comment "$PR_NUMBER" --repo "$REPO" --body "✅ Build passed for this pull request."
