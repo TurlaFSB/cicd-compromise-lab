@@ -301,6 +301,8 @@ Pinning locks in whatever each tag points at *right now*. If an upstream tag was
 ./verify/02-script-injection/verify.sh static
 ```
 
+A reproducible record of a full local test run of the closed loop for scenarios 04–14 — structural verification, attack simulations, and detection cross-checks — is kept in [`docs/verification-evidence.md`](docs/verification-evidence.md).
+
 ### Scan your own repos
 
 The detection scripts work against any GitHub Actions repository. Point them at your own projects to check for the same vulnerability patterns:
