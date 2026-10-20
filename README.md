@@ -193,6 +193,64 @@ cicd-compromise-lab/
 Vulnerable workflows live in separate repos under the `turla-lab-targets`
 org (see `vulnerable/README.md`), never in this repo.
 
+## Demonstration methodology and reproducibility
+
+Each scenario ships the same four artifacts — a vulnerable workflow fixture, a
+Sigma rule plus a scanner (`detections/<id>/detect.sh`), a hardened workflow,
+and a verification suite (`verify/<id>/verify.sh`). "Complete" in the scenario
+table means all four are present and the verification suite passes. On top of
+that baseline, the *attack itself* is demonstrated at one of three tiers,
+chosen by what can be shown **safely, legally, and reproducibly**:
+
+| Tier | What it means | Scenarios |
+|---|---|---|
+| **Live** | The attack is executed against a real, intentionally-vulnerable target repo under [`turla-lab-targets`](https://github.com/turla-lab-targets); the captured GitHub Actions run (metadata + logs) is stored under `attacks/<id>/evidence/`. | 01, 02 |
+| **Simulation** | The attack mechanism is reproduced offline by `attacks/<id>/simulate.sh`, which models the relevant GitHub/runner behaviour deterministically and reports exploited-vs-safe for the vulnerable and hardened inputs. | 05, 06, 07, 08, 10, 11, 12, 13, 14 |
+| **Structural** | The vulnerability is a static property of the workflow; the scanner proves it is present in the vulnerable fixture and absent in the hardened one. | 03, 04, 09 |
+
+### Why not every scenario is "live"
+
+Running every attack against live infrastructure is **not** the strongest form
+of evidence for a lab of this kind, and for three scenarios it would be
+irresponsible or impossible:
+
+- **07 (self-hosted runner persistence)** requires a self-hosted runner, i.e. a
+  machine the lab operator controls and attaches to GitHub. The persistence
+  mechanism cannot be shown on ephemeral GitHub-hosted runners.
+- **12 (OIDC trust policy)** requires a real cloud IAM account (e.g. AWS) that
+  trusts GitHub's OIDC issuer. The GitHub half (minting the OIDC token and its
+  `sub`/`aud` claims) is reproducible; the cloud-acceptance half is not, without
+  provisioning cloud infrastructure.
+- **14 (dependency confusion)** would, to be truly "live", require publishing a
+  higher-versioned package under an internal scope's name to the **public** npm
+  registry so it wins resolution. That is harmful to the ecosystem and to anyone
+  who might install it, so this lab **deliberately does not do it** and models
+  the resolution outcome offline instead.
+
+Deterministic simulation is also the **reproducibility backbone**: it runs in CI
+with no external dependencies, no credentials, and no network, so anyone can
+reproduce every result with `./lab verify` on a clean checkout. The live runs
+(01, 02) are illustrative proof-of-realism, not a reproduction requirement.
+
+### Reproduce everything locally
+
+```bash
+./lab verify         # all 14 verification suites (offline, deterministic, no network)
+./lab scan .         # scanners find zero issues in this repo's own hardened workflows
+```
+
+Each simulation can also be run directly, against both the vulnerable and the
+hardened input, e.g.:
+
+```bash
+./attacks/08-env-injection/simulate.sh                                    # vulnerable: INJECTABLE
+./attacks/08-env-injection/simulate.sh hardened/08-env-injection/triage.yml   # hardened: SAFE
+```
+
+Captured live evidence is under `attacks/01-pwn-request/evidence/` and
+`attacks/02-script-injection/evidence/`, each pointing at the exact public
+Actions run it was taken from.
+
 ## Quick start
 
 The `lab` script is the single entry point for everything below:
