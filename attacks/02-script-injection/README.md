@@ -54,15 +54,17 @@ The same vulnerability applies to any untrusted context interpolated in a `run:`
 
 ## Evidence
 
+**Captured live run:** [turla-lab-targets/script-injection-target#1 / run 39404529625](https://github.com/turla-lab-targets/script-injection-target/actions/runs/39404529625) — `issues` event, conclusion `success`. See [`evidence/`](evidence/) for the run metadata and the triage-step log excerpt.
+
+An issue titled `Edge case in add() for large inputs $(id -un)-RCEPROOF-S02` was opened against the target. The vulnerable workflow expanded the title into its `run:` step; the generated script contained the raw `$(id -un)`, and the executed output was `...runner-RCEPROOF-S02` — the command substitution ran as the runner user. Had the title been treated as inert data (as the hardened workflow does), the log would show the literal `$(id -un)`. The run's `GITHUB_TOKEN` carried `Issues: write`, so injected code acts with that token. The marker is benign (`id -un`); no secret is read or exfiltrated.
+
 A successful attack produces observable evidence:
 
 1. **Workflow run logs** show the injected commands executing in the triage step.
 2. **Repo artifacts or issues** created by the payload (e.g., a new issue containing a hashed secret value, proving the attacker could read it).
-3. **API audit trail** — any actions taken with the stolen `GITHUB_TOKEN` appear in the repo's audit log.
+3. **API audit trail** — any actions taken with the `GITHUB_TOKEN` appear in the repo's audit log.
 
-The `payload/` directory contains the evidence-collection approach:
-
-- The payload hashes the `DUMMY_CLOUD_KEY1` secret (to prove access without exposing the value) and posts the hash as a new issue, creating a durable evidence trail.
+The `payload/` directory documents the evidence-collection approach: a payload can hash the `DUMMY_CLOUD_KEY1` secret (to prove access without exposing the value) and post the hash as a new issue. The captured run above deliberately uses only a benign `id -un` marker, which is sufficient to prove code execution without touching any secret.
 
 ## MITRE ATT&CK mapping
 

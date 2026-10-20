@@ -1,0 +1,22 @@
+{
+  "id": 39404529625,
+  "name": "Issue triage (VULNERABLE — script injection demo, scenario 02)",
+  "display_title": "Edge case in add() for large inputs $(id -un)-RCEPROOF-S02",
+  "event": "issues",
+  "status": "completed",
+  "conclusion": "success",
+  "head_branch": "main",
+  "head_sha": "f62f1cb5d713e855059db3d5ec3c0426265cc383",
+  "path": ".github/workflows/triage.yml",
+  "html_url": "https://github.com/turla-lab-targets/script-injection-target/actions/runs/39404529625",
+  "triggering_actor": "TurlaFSB",
+  "created_at": "2026-10-20T09:58:06Z",
+  "run_started_at": "2026-10-20T09:58:06Z",
+  "updated_at": "2026-10-20T09:58:12Z",
+  "triage_job": {
+    "id": 118567127136,
+    "runner_name": "GitHub Actions 1000000002",
+    "github_token_permissions": { "contents": "read", "issues": "write", "metadata": "read" }
+  },
+  "source_issue": "https://github.com/turla-lab-targets/script-injection-target/issues/1"
+}
