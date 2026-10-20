@@ -301,7 +301,7 @@ Pinning locks in whatever each tag points at *right now*. If an upstream tag was
 ./verify/02-script-injection/verify.sh static
 ```
 
-A reproducible record of a full local test run of the closed loop for scenarios 04–14 — structural verification, attack simulations, and detection cross-checks — is kept in [`docs/verification-evidence.md`](docs/verification-evidence.md).
+A reproducible record of a full local test run of the closed loop for scenarios 04–14 — structural verification, attack simulations, and detection cross-checks — is kept in [`docs/verification-evidence.md`](docs/verification-evidence.md). The operator procedure for exercising those scenarios **live** against the disposable `turla-lab-targets` repos is in [`docs/live-target-testing.md`](docs/live-target-testing.md).
 
 ### Scan your own repos
 
