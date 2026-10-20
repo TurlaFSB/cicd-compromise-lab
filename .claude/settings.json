@@ -1,1 +1,11 @@
-{}
+{
+  "permissions": {
+    "allow": [
+      "Bash(gh:*)",
+      "Bash(git clone:*)",
+      "Bash(git push:*)",
+      "Bash(git fetch:*)",
+      "Bash(git pull:*)"
+    ]
+  }
+}
